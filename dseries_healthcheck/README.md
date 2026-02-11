@@ -1,14 +1,14 @@
 # ESP dSeries Workload Automation Health Check Tool
 
 **Version:** 1.0.0  
-**Date:** February 9, 2026  
+**Date:** February 11, 2026  
 **Status:** Production Ready
 
 ---
 
 ## 📋 Overview
 
-Comprehensive health check tool for ESP dSeries Workload Automation based on industry best practices and dSeries-specific requirements.
+Comprehensive health check tool and demo environment setup solution for ESP dSeries Workload Automation based on industry best practices and dSeries-specific requirements.
 
 ### **Purpose**
 
@@ -17,6 +17,7 @@ Comprehensive health check tool for ESP dSeries Workload Automation based on ind
 - Ensure system readiness for production workloads
 - Provide actionable recommendations for optimization
 - Support services and customer deployments
+- **NEW:** Automated demo environment setup for sales and services teams
 
 ### **Key Features**
 
@@ -27,49 +28,107 @@ Comprehensive health check tool for ESP dSeries Workload Automation based on ind
 ✅ **Detailed Reporting** - HTML, JSON, and text formats  
 ✅ **Remediation Guidance** - Step-by-step fix instructions  
 ✅ **Trend Analysis** - Historical health tracking  
+✅ **NEW: Demo Environment Setup** - One-command setup for demos (15 minutes)  
+✅ **NEW: Multiple Version Support** - 12.4 and 25.0 side-by-side  
+✅ **NEW: Sample Applications** - Pre-configured demo scenarios  
 
 ---
 
 ## 🚀 Quick Start
 
-### **Installation**
+### **Option 1: Demo Environment Setup (NEW!)**
 
-```bash
-# Extract the health check package
-cd /opt/CA/WA_DE
-unzip dseries_healthcheck_v1.0.zip
-
-# Set execute permissions
-chmod +x healthcheck/*.sh
-
-# Run the health check
-cd healthcheck
-./run_healthcheck.sh
-```
-
-### **Windows Installation**
+Perfect for sales demos, customer evaluations, and training:
 
 ```powershell
-# Extract to dSeries installation directory
-cd "C:\CA\WA_DE"
-Expand-Archive dseries_healthcheck_v1.0.zip
+# One-command setup - Ready in 15 minutes!
+cd C:\Codes\dseries_healthcheck
+.\Setup-DSeriesDemoEnvironment.ps1 -Version 12.4 -Environment Demo -ImportSamples -StartServices
 
-# Run the health check
-cd healthcheck
-.\run_healthcheck.bat
+# Access your demo environment
+# URL: http://localhost:7599
+# Login: demo_admin / Demo2026!
 ```
 
-### **Quick Health Check (5 minutes)**
+**See:** [DEMO_ENVIRONMENT_SETUP_GUIDE.md](DEMO_ENVIRONMENT_SETUP_GUIDE.md) for complete details.
+
+---
+
+### **Option 2: Health Check on Existing Installation**
+
+```powershell
+# Windows - Simple health check
+cd C:\Codes\dseries_healthcheck
+.\Run-HealthCheck.ps1 -InstallDir "C:\CA\ESPdSeriesWAServer_R12_4"
+
+# Windows - Using batch file
+.\run_healthcheck_simple.bat "C:\CA\ESPdSeriesWAServer_R12_4"
+```
 
 ```bash
+# Linux - Quick health check (5 minutes)
 ./run_healthcheck.sh --quick
-```
 
-### **Full Health Check (15-20 minutes)**
-
-```bash
+# Linux - Full health check (15-20 minutes)
 ./run_healthcheck.sh --full
 ```
+
+---
+
+## 🎯 Demo Environment Setup (NEW!)
+
+### **For Sales and Services Teams**
+
+Quickly set up complete dSeries demo environments with embedded PostgreSQL, sample applications, and pre-configured demo scenarios.
+
+**Key Benefits:**
+- ⏱️ **Fast Setup** - 15-20 minutes (automated)
+- 🎯 **Demo-Ready** - Pre-configured with sample data
+- 📦 **Complete** - Database, server, samples, users
+- 🔄 **Multiple Versions** - Support for 12.4 and 25.0
+- ✅ **Validated** - Automatic health check after setup
+
+### **Quick Setup Commands**
+
+```powershell
+# Standard Demo Environment (12.4)
+.\Setup-DSeriesDemoEnvironment.ps1 -Version 12.4 -Environment Demo -ImportSamples -StartServices
+
+# Sales Evaluation Environment (25.0)
+.\Setup-DSeriesDemoEnvironment.ps1 -Version 25.0 -Environment Sales -ImportSamples -StartServices
+
+# Development Environment
+.\Setup-DSeriesDemoEnvironment.ps1 -Version 12.4 -Environment Development
+
+# Side-by-Side Comparison (12.4 and 25.0)
+.\Setup-DSeriesDemoEnvironment.ps1 -Version 12.4 -InstallPath "C:\CA\dSeries_12_4" -ServerPort 7599 -ImportSamples
+.\Setup-DSeriesDemoEnvironment.ps1 -Version 25.0 -InstallPath "C:\CA\dSeries_25_0" -ServerPort 7600 -ImportSamples
+```
+
+### **What Gets Configured**
+
+✅ **PostgreSQL Database** - Embedded, optimized for demos  
+✅ **dSeries Server** - JVM heap 4GB, production-ready settings  
+✅ **Demo Users** - demo_admin, demo_user, sales_demo  
+✅ **Sample Applications** - 5 pre-configured applications  
+✅ **Demo Jobs** - 10+ ready-to-run jobs  
+✅ **Health Check** - Automatic validation after setup  
+✅ **Quick Start Guide** - Created in installation directory  
+
+### **Demo Scenarios Included**
+
+1. **Job Scheduling** (5 min) - Create and schedule jobs
+2. **Workflow Creation** (10 min) - Build complex workflows
+3. **Agent Management** (8 min) - Deploy and manage agents
+4. **Monitoring & Alerting** (7 min) - Real-time monitoring
+5. **REST API Integration** (10 min) - API demonstrations
+
+### **Documentation**
+
+- **[DEMO_ENVIRONMENT_SETUP_GUIDE.md](DEMO_ENVIRONMENT_SETUP_GUIDE.md)** - Complete setup guide
+- **[DEMO_QUICK_REFERENCE_CARD.md](DEMO_QUICK_REFERENCE_CARD.md)** - Quick reference for demos
+- **[DEPLOYMENT_PACKAGE_CHECKLIST.md](DEPLOYMENT_PACKAGE_CHECKLIST.md)** - Package preparation
+- **[SAMPLE_APPLICATIONS_TEMPLATE.md](SAMPLE_APPLICATIONS_TEMPLATE.md)** - Create custom demos
 
 ---
 

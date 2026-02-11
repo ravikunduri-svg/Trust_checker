@@ -27,6 +27,33 @@ Perfect for getting started quickly.
 
 ---
 
+## 🎯 Demo Environment Setup (NEW!)
+
+For sales and services teams setting up demo environments.
+
+| Document | Purpose | Audience | Read Time |
+|----------|---------|----------|-----------|
+| **DEMO_ENVIRONMENT_SETUP_GUIDE.md** | Complete demo setup guide | Sales, Services | 30 min |
+| **DEMO_QUICK_REFERENCE_CARD.md** | Quick reference for demos | Sales, Services | 5 min |
+| **DEPLOYMENT_PACKAGE_CHECKLIST.md** | Package preparation checklist | DevOps, Services | 20 min |
+| **SAMPLE_APPLICATIONS_TEMPLATE.md** | Create custom demo apps | Sales, Services | 25 min |
+
+**For Demo Setup:** Start with **DEMO_ENVIRONMENT_SETUP_GUIDE.md**, then use **DEMO_QUICK_REFERENCE_CARD.md** during demos.
+
+### Demo Setup Scripts
+
+| Script | Purpose | Time |
+|--------|---------|------|
+| **Setup-DSeriesDemoEnvironment.ps1** | Automated demo environment setup | 15-20 min |
+| **Run-HealthCheck.ps1** | Health check on demo environment | 2-3 min |
+
+**Quick Demo Setup:**
+```powershell
+.\Setup-DSeriesDemoEnvironment.ps1 -Version 12.4 -Environment Demo -ImportSamples -StartServices
+```
+
+---
+
 ## 🏗️ Architecture & Technical Documentation
 
 For understanding how the tool works internally.
@@ -160,6 +187,32 @@ Understanding health check output.
 cd C:\Codes\dseries_healthcheck
 run_healthcheck_simple.bat "C:\CA\ESPdSeriesWAServer_R12_4"
 ```
+
+---
+
+### Use Case 1A: Demo Environment Setup (NEW!)
+
+**Goal:** Set up a complete demo environment for sales/customer presentations
+
+**Documents to Read:**
+1. README.md → Demo Environment Setup section (5 min)
+2. DEMO_ENVIRONMENT_SETUP_GUIDE.md (30 min)
+3. DEMO_QUICK_REFERENCE_CARD.md (5 min)
+
+**Total Time:** 40 minutes (reading) + 15 minutes (setup)
+
+**Commands:**
+```powershell
+cd C:\Codes\dseries_healthcheck
+.\Setup-DSeriesDemoEnvironment.ps1 -Version 12.4 -Environment Demo -ImportSamples -StartServices
+```
+
+**Result:**
+- Complete dSeries environment ready in 15 minutes
+- Pre-configured with sample applications and jobs
+- Demo users created (demo_admin / Demo2026!)
+- Health check automatically run
+- Quick start guide created in installation directory
 
 ---
 
@@ -440,12 +493,14 @@ Use this checklist to ensure you have all necessary documentation:
 
 ## 📊 Documentation Statistics
 
-- **Total Documents:** 30+
-- **Total Pages:** 500+ (estimated)
-- **Total Words:** 50,000+ (estimated)
-- **Code Examples:** 100+
-- **Diagrams:** 20+
-- **Tables:** 50+
+- **Total Documents:** 35+
+- **Total Pages:** 600+ (estimated)
+- **Total Words:** 65,000+ (estimated)
+- **Code Examples:** 150+
+- **Diagrams:** 25+
+- **Tables:** 60+
+- **Demo Scenarios:** 5 complete scenarios
+- **Sample Applications:** 5 templates
 
 ---
 
