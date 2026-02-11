@@ -1,0 +1,278 @@
+================================================================================
+  dSeries Health Check Tool - Quick Reference Card
+================================================================================
+
+VERSION: 1.0.0
+DATE:    February 11, 2026
+STATUS:  Production Ready
+
+================================================================================
+  QUICK START
+================================================================================
+
+METHOD 1: Batch File (Easiest)
+  cd C:\Codes\dseries_healthcheck
+  run_healthcheck_simple.bat "C:\CA\ESPdSeriesWAServer_R12_4"
+
+METHOD 2: PowerShell (Most Features)
+  cd C:\Codes\dseries_healthcheck
+  .\Run-HealthCheck.ps1 -InstallDir "C:\CA\ESPdSeriesWAServer_R12_4"
+
+METHOD 3: Direct Java (Cross-Platform)
+  cd C:\Codes\dseries_healthcheck
+  java DSeriesHealthCheckSimple "C:\CA\ESPdSeriesWAServer_R12_4"
+
+================================================================================
+  COMMAND SYNTAX
+================================================================================
+
+Batch File:
+  run_healthcheck_simple.bat [installation_directory]
+
+PowerShell:
+  .\Run-HealthCheck.ps1 -InstallDir <path> [-GenerateReports]
+
+Java:
+  java DSeriesHealthCheckSimple [installation_directory]
+
+================================================================================
+  COMMON COMMANDS
+================================================================================
+
+# Run health check
+run_healthcheck_simple.bat "C:\CA\ESPdSeriesWAServer_R12_4"
+
+# Get help
+run_healthcheck_simple.bat
+Get-Help .\Run-HealthCheck.ps1
+
+# View latest report
+notepad HEALTH_CHECK_RESULTS_*.md
+
+# View summary
+type EXECUTIVE_SUMMARY_*.txt
+
+# View action plan
+notepad ACTION_PLAN_*.md
+
+================================================================================
+  EXIT CODES
+================================================================================
+
+0 = SUCCESS   (Health score >= 60, system is FAIR or better)
+1 = FAILURE   (Health score < 60, system is POOR or CRITICAL)
+2 = ERROR     (Invalid input or execution error)
+
+================================================================================
+  HEALTH CHECKS PERFORMED
+================================================================================
+
+[SYS-001] CPU Utilization           (Critical)
+[SYS-002] Memory Usage               (High)
+[SYS-003] Disk Space                 (Critical)
+[SRV-001] JVM Heap Size              (Critical) **MOST IMPORTANT**
+[DB-001]  Database Connectivity      (Critical)
+[SRV-003] Server Port Accessibility  (Critical)
+[SRV-005] Installation Directory     (Medium)
+
+================================================================================
+  HEALTH SCORE GUIDE
+================================================================================
+
+90-100 = EXCELLENT  (System optimally configured)
+75-89  = GOOD       (Minor improvements recommended)
+60-74  = FAIR       (Several issues need attention)
+40-59  = POOR       (Significant problems detected)
+0-39   = CRITICAL   (System at risk)
+
+================================================================================
+  LATEST TEST RESULTS (C:\CA\ESPdSeriesWAServer_R12_4)
+================================================================================
+
+Date:         February 11, 2026 21:38:57
+Host:         G36R0T3
+Health Score: 42/100 (POOR)
+
+Passed:       3 checks
+Warnings:     0 checks
+Failed:       3 checks
+
+CRITICAL ISSUES:
+  1. Disk Space: 98.2% used (only 9 GB free) - URGENT CLEANUP NEEDED
+  2. JVM Heap: 1024 MB (needs 4096 MB) - MUST FIX BEFORE PRODUCTION
+  3. Server Port: Not accessible - SERVICE NOT RUNNING
+
+================================================================================
+  IMMEDIATE ACTIONS
+================================================================================
+
+1. FREE UP DISK SPACE (DO NOW - 10 min)
+   cd C:\Codes\dseries_healthcheck
+   .\cleanup_dseries.ps1 -InstallDir "C:\CA\ESPdSeriesWAServer_R12_4"
+   Expected: 80-100 GB freed
+
+2. FIX JVM HEAP (URGENT - 5 min)
+   .\fix_jvm_heap.ps1 -InstallDir "C:\CA\ESPdSeriesWAServer_R12_4" -HeapSizeMB 4096
+   OR manually edit: conf\windows.service.properties
+   Change: jvmproperty_3=-Xmx1024M to jvmproperty_3=-Xmx4096M
+
+3. START SERVICE (5 min)
+   Start-Service "ESP dSeries Workload Automation"
+   Test-NetConnection -ComputerName localhost -Port 7599
+
+4. VERIFY (2 min)
+   run_healthcheck_simple.bat "C:\CA\ESPdSeriesWAServer_R12_4"
+   Expected: Health score 75-85 (GOOD)
+
+================================================================================
+  SCHEDULED EXECUTION
+================================================================================
+
+Daily Check (Windows Task Scheduler):
+  schtasks /create /tn "dSeries Health Check" ^
+    /tr "C:\Codes\dseries_healthcheck\run_healthcheck_simple.bat C:\CA\ESPdSeriesWAServer_R12_4" ^
+    /sc daily /st 06:00
+
+PowerShell Scheduled Task:
+  $action = New-ScheduledTaskAction -Execute "PowerShell.exe" `
+    -Argument "-File C:\Codes\dseries_healthcheck\Run-HealthCheck.ps1 -InstallDir C:\CA\ESPdSeriesWAServer_R12_4"
+  $trigger = New-ScheduledTaskTrigger -Daily -At 6am
+  Register-ScheduledTask -TaskName "dSeries Health Check" -Action $action -Trigger $trigger
+
+================================================================================
+  MULTIPLE INSTALLATIONS
+================================================================================
+
+Check all installations:
+  for %%d in (
+      "C:\CA\ESPdSeriesWAServer_R12_4"
+      "D:\CA\ESPdSeriesWAServer_R12_5"
+  ) do run_healthcheck_simple.bat "%%d"
+
+================================================================================
+  TROUBLESHOOTING
+================================================================================
+
+ISSUE: "Java not found"
+  SOLUTION: Install Java 8+ and add to PATH
+
+ISSUE: "Installation directory not found"
+  SOLUTION: Verify path is correct, use quotes for paths with spaces
+
+ISSUE: "Compilation failed"
+  SOLUTION: Install JDK (not just JRE), ensure javac is in PATH
+
+ISSUE: "Permission denied"
+  SOLUTION: Run as Administrator, check file permissions
+
+================================================================================
+  FILE LOCATIONS
+================================================================================
+
+Tool Directory:  C:\Codes\dseries_healthcheck\
+Main Script:     DSeriesHealthCheckSimple.java
+Batch File:      run_healthcheck_simple.bat
+PowerShell:      Run-HealthCheck.ps1
+Documentation:   USAGE_GUIDE.md
+
+Reports:
+  - HEALTH_CHECK_RESULTS_YYYYMMDD.md  (Detailed analysis)
+  - ACTION_PLAN_YYYYMMDD.md           (Remediation steps)
+  - EXECUTIVE_SUMMARY_YYYYMMDD.txt    (Quick summary)
+
+================================================================================
+  DOCUMENTATION
+================================================================================
+
+USAGE_GUIDE.md               - Complete usage instructions
+BUILD_SUMMARY.md             - Build and enhancement summary
+README.md                    - Tool overview and features
+BEST_PRACTICES_GUIDE.md      - dSeries best practices
+QUICK_START_REMEDIATION.md   - Quick fix guide
+JAVA_README.md               - Java implementation details
+
+================================================================================
+  SUPPORT
+================================================================================
+
+Broadcom Support:  https://support.broadcom.com
+Email:             dseries-support@broadcom.com
+Documentation:     See files listed above
+
+================================================================================
+  BEST PRACTICES
+================================================================================
+
+1. Run health check DAILY (scheduled at 6 AM)
+2. Review reports WEEKLY
+3. Fix warnings within 1 WEEK
+4. Fix failures IMMEDIATELY
+5. Maintain health score >= 75 (GOOD)
+6. Keep JVM heap >= 4096 MB
+7. Keep disk free space >= 20%
+8. Monitor trends over time
+
+================================================================================
+  CRITICAL THRESHOLDS
+================================================================================
+
+CPU Usage:       Warning: 70%    Critical: 85%
+Memory Usage:    Warning: 80%    Critical: 90%
+Disk Usage:      Warning: 75%    Critical: 85%
+JVM Heap:        Minimum: 4096 MB (CRITICAL for dSeries!)
+Disk Free:       Minimum: 20% free space
+
+================================================================================
+  EXAMPLE OUTPUT
+================================================================================
+
+=================================================================
+  ESP dSeries Workload Automation Health Check Tool v1.0.0
+=================================================================
+  Date: 2026-02-11 21:38:57
+  Host: G36R0T3
+  dSeries: C:\CA\ESPdSeriesWAServer_R12_4
+=================================================================
+
+[SYS-001] Checking CPU Utilization...
+  [PASS] CPU usage is 45.2% (healthy)
+
+[SYS-002] Checking Memory Usage...
+  [PASS] Memory usage is 65.3% (healthy)
+
+[SYS-003] Checking Disk Space...
+  [FAIL] CRITICAL: Disk usage is 98.2%
+         Recommendation: Clean up old logs, archives.
+
+...
+
+=================================================================
+  HEALTH CHECK SUMMARY
+=================================================================
+  Overall Health Score: 42/100
+  Status: POOR
+  Total Checks: 7
+  [PASS] Passed: 3
+  [WARN] Warnings: 0
+  [FAIL] Failed: 3
+=================================================================
+
+================================================================================
+  QUICK TIPS
+================================================================================
+
+- Always use quotes around paths with spaces
+- Run as Administrator if permission issues occur
+- Check exit code in scripts: %ERRORLEVEL% (batch) or $LASTEXITCODE (PS)
+- Reports are timestamped - review latest ones
+- JVM heap size is THE MOST CRITICAL setting for dSeries
+- Schedule daily checks for proactive monitoring
+- Keep this reference card handy!
+
+================================================================================
+
+Last Updated: February 11, 2026
+Version: 1.0.0
+Copyright © 2026 Broadcom. All Rights Reserved.
+
+================================================================================

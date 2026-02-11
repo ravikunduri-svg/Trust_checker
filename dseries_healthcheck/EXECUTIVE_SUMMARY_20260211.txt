@@ -1,0 +1,163 @@
+================================================================================
+  ESP dSeries Health Check - Executive Summary
+================================================================================
+
+Date:        February 11, 2026 21:28:56
+System:      C:\CA\ESPdSeriesWAServer_R12_4
+Host:        G36R0T3
+Version:     R12.4.00.00
+
+================================================================================
+  OVERALL HEALTH SCORE: 28/100
+  STATUS: CRITICAL 🔴
+================================================================================
+
+Total Checks:     7
+Passed:           2 ✅
+Warnings:         0 ⚠️
+Failed:           4 ❌
+Skipped:          1 ⏭️
+
+================================================================================
+  CRITICAL ISSUES (4)
+================================================================================
+
+1. CPU UTILIZATION - CRITICAL
+   Current:  100.0%
+   Limit:    85%
+   Action:   Investigate high CPU processes immediately
+   Priority: HIGHEST
+
+2. DISK SPACE - CRITICAL
+   Current:  98.2% used (462 GB / 471 GB)
+   Free:     Only 9 GB remaining
+   Limit:    85%
+   Action:   Emergency cleanup required - free up 100+ GB
+   Priority: HIGHEST
+
+3. JVM HEAP SIZE - CRITICAL
+   Current:  1024 MB
+   Required: 4096 MB minimum
+   Action:   Increase heap size to 4096 MB
+   Priority: HIGH
+
+4. SERVER PORT NOT ACCESSIBLE - CRITICAL
+   Port:     7599
+   Status:   Not accessible (Connection refused)
+   Action:   Start dSeries service
+   Priority: HIGH
+
+================================================================================
+  PASSED CHECKS (2)
+================================================================================
+
+✅ Memory Usage:           0.0% (7 MB / 16304 MB) - Healthy
+✅ Installation Directory: All key directories present
+
+================================================================================
+  IMMEDIATE ACTIONS REQUIRED
+================================================================================
+
+STEP 1: FREE UP DISK SPACE (DO NOW - 10 minutes)
+   cd C:\Codes\dseries_healthcheck
+   .\cleanup_dseries.ps1 -InstallDir "C:\CA\ESPdSeriesWAServer_R12_4"
+   
+   Expected: 80-100 GB freed
+
+STEP 2: INVESTIGATE CPU (DO NOW - 15 minutes)
+   Get-Process | Sort-Object CPU -Descending | Select-Object -First 10
+   
+   Identify and stop high CPU processes
+
+STEP 3: FIX JVM HEAP (WITHIN 24 HOURS - 5 minutes)
+   cd C:\Codes\dseries_healthcheck
+   .\fix_jvm_heap.ps1 -InstallDir "C:\CA\ESPdSeriesWAServer_R12_4" -HeapSizeMB 4096
+   
+   OR manually edit: conf\windows.service.properties
+   Change: jvmproperty_3=-Xmx1024M
+   To:     jvmproperty_3=-Xmx4096M
+
+STEP 4: START SERVICE (AFTER STEP 3 - 5 minutes)
+   Start-Service "ESP dSeries Workload Automation"
+   Test-NetConnection -ComputerName localhost -Port 7599
+
+STEP 5: VERIFY (AFTER ALL STEPS - 2 minutes)
+   cd C:\Codes\dseries_healthcheck
+   java DSeriesHealthCheckSimple
+   
+   Expected: Health score 75-85 (GOOD)
+
+================================================================================
+  DISK CLEANUP TARGETS
+================================================================================
+
+High-Value Cleanup Opportunities:
+- *.zip files in root directory:     50-60 GB
+- UPDATE_* backup directories:       30-40 GB  
+- Old log files (>30 days):          5-10 GB
+- Temp directory:                    1-5 GB
+                                     --------
+Total potential savings:             86-115 GB
+
+================================================================================
+  SYSTEM INFORMATION
+================================================================================
+
+Installation:    C:\CA\ESPdSeriesWAServer_R12_4
+Version:         R12.4.00.00
+Latest Build:    1383 (December 16, 2025)
+Java:            JRE 17 available
+
+Database:
+  Host:          G36R0T3
+  Port:          5432
+  Database:      dseries
+  User:          postgres
+
+Server:
+  Port:          7599
+  Status:        NOT RUNNING
+
+================================================================================
+  EXPECTED OUTCOME AFTER REMEDIATION
+================================================================================
+
+Before:                          After:
+- Health Score:  28/100 (CRITICAL)    →    75-85/100 (GOOD)
+- Disk Usage:    98.2%                →    70-75%
+- CPU Usage:     100%                 →    30-50%
+- JVM Heap:      1024 MB              →    4096 MB
+- Service:       Down                 →    Running
+- Port 7599:     Not accessible       →    Accessible
+
+Time Required:   1-2 hours
+Risk Level:      Low-Medium
+Success Rate:    95%+
+
+================================================================================
+  DETAILED REPORTS
+================================================================================
+
+Full Report:         HEALTH_CHECK_RESULTS_20260211.md
+Action Plan:         ACTION_PLAN_20260211.md
+Best Practices:      BEST_PRACTICES_GUIDE.md
+Quick Reference:     QUICK_START_REMEDIATION.md
+
+================================================================================
+  SUPPORT
+================================================================================
+
+Broadcom Support:    https://support.broadcom.com
+Tool Location:       C:\Codes\dseries_healthcheck
+Health Check:        java DSeriesHealthCheckSimple
+
+================================================================================
+
+NEXT STEP: Start with disk cleanup immediately!
+Command: .\cleanup_dseries.ps1 -InstallDir "C:\CA\ESPdSeriesWAServer_R12_4"
+
+================================================================================
+Report Generated: February 11, 2026 21:28:56
+Tool Version: 1.0.0
+Copyright © 2026 Broadcom. All Rights Reserved.
+================================================================================

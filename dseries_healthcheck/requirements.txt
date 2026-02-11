@@ -1,0 +1,33 @@
+# ESP dSeries Health Check Tool - Python Dependencies
+# Version: 1.0.0
+# Date: 2026-02-09
+
+# Core dependencies
+psutil>=5.9.0           # System and process utilities
+requests>=2.31.0        # HTTP library for REST API calls
+
+# Database drivers (install only what you need)
+psycopg2-binary>=2.9.0  # PostgreSQL driver
+# cx_Oracle>=8.3.0      # Oracle driver (uncomment if using Oracle)
+# pyodbc>=4.0.0         # SQL Server driver (uncomment if using SQL Server)
+
+# Reporting
+Jinja2>=3.1.0           # Template engine for reports
+MarkupSafe>=2.1.0       # Safe string handling
+
+# Optional: PDF generation
+# reportlab>=4.0.0      # Uncomment for PDF report generation
+# weasyprint>=60.0      # Alternative PDF generator
+
+# Optional: Email notifications
+# smtplib (built-in)    # Email sending
+
+# Optional: Excel reports
+# openpyxl>=3.1.0       # Excel file generation
+
+# Optional: Trend analysis
+# matplotlib>=3.7.0     # Charting and visualization
+# pandas>=2.0.0         # Data analysis
+
+# Optional: Advanced monitoring
+# prometheus_client>=0.18.0  # Prometheus metrics export

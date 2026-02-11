@@ -1,0 +1,204 @@
+{
+  "_comment": "ESP dSeries Workload Automation Health Check Configuration",
+  "_version": "1.0.0",
+  "_last_updated": "2026-02-09",
+  
+  "database": {
+    "host": "localhost",
+    "port": 5432,
+    "name": "WADB",
+    "user": "wauser",
+    "password_file": "/opt/CA/WA_DE/.dbpass",
+    "type": "postgresql",
+    "_type_options": ["postgresql", "oracle", "mssql"],
+    "connection_timeout": 30,
+    "query_timeout": 60
+  },
+  
+  "server": {
+    "host": "localhost",
+    "port": 7507,
+    "admin_user": "admin",
+    "admin_password_file": "/opt/CA/WA_DE/.adminpass",
+    "install_dir": "/opt/CA/WA_DE",
+    "ssl_enabled": false,
+    "ssl_verify": true
+  },
+  
+  "thresholds": {
+    "cpu": {
+      "warning": 70,
+      "critical": 85,
+      "_comment": "CPU utilization percentage"
+    },
+    "memory": {
+      "warning": 80,
+      "critical": 90,
+      "_comment": "Memory utilization percentage"
+    },
+    "disk": {
+      "warning": 75,
+      "critical": 85,
+      "_comment": "Disk space utilization percentage"
+    },
+    "swap": {
+      "warning": 10,
+      "critical": 50,
+      "_comment": "Swap usage percentage"
+    },
+    "jvm": {
+      "heap_min_mb": 4096,
+      "heap_recommended_mb": 4096,
+      "heap_max_mb": 8192,
+      "gc_frequency_per_minute": 10,
+      "gc_pause_ms": 500,
+      "_comment": "JVM heap sizes in megabytes"
+    },
+    "database": {
+      "min_available_connections": 5,
+      "max_query_time_ms": 500,
+      "max_backup_age_hours": 24,
+      "max_index_fragmentation_percent": 30,
+      "_comment": "Database performance thresholds"
+    },
+    "workload": {
+      "max_queue_depth": 1000,
+      "max_job_duration_minutes": 240,
+      "max_failed_jobs_percent": 5,
+      "min_success_rate_percent": 95,
+      "_comment": "Workload performance thresholds"
+    },
+    "agent": {
+      "max_communication_lag_seconds": 5,
+      "max_failed_ping_percent": 5,
+      "cpu_warning": 80,
+      "memory_warning": 85,
+      "disk_critical": 90,
+      "_comment": "Agent health thresholds"
+    }
+  },
+  
+  "workload": {
+    "size": "medium",
+    "_size_options": ["small", "medium", "large"],
+    "daily_jobs_count": 50000,
+    "_sizing_guide": {
+      "small": "0-15,000 daily jobs",
+      "medium": "15,001-75,000 daily jobs",
+      "large": "75,001-150,000 daily jobs"
+    },
+    "thread_pools": {
+      "_comment": "Thread pool configuration based on workload size",
+      "small": {
+        "download_threads": 3,
+        "db_update_threads": 2,
+        "selector_threads": 4,
+        "post_process_threads": 4,
+        "tracker_workers": 4
+      },
+      "medium": {
+        "download_threads": 6,
+        "db_update_threads": 4,
+        "selector_threads": 8,
+        "post_process_threads": 8,
+        "tracker_workers": 8
+      },
+      "large": {
+        "download_threads": 8,
+        "db_update_threads": 8,
+        "selector_threads": 12,
+        "post_process_threads": 12,
+        "tracker_workers": 12
+      }
+    }
+  },
+  
+  "reporting": {
+    "output_dir": "/var/log/dseries/healthcheck",
+    "retention_days": 90,
+    "formats": ["html", "json"],
+    "_format_options": ["html", "json", "pdf", "excel"],
+    "include_recommendations": true,
+    "include_historical_trends": false
+  },
+  
+  "alerting": {
+    "enabled": false,
+    "email": {
+      "enabled": false,
+      "smtp_host": "smtp.company.com",
+      "smtp_port": 587,
+      "smtp_user": "healthcheck@company.com",
+      "smtp_password_file": "/opt/CA/WA_DE/.smtppass",
+      "use_tls": true,
+      "from_address": "dseries-healthcheck@company.com",
+      "recipients": [
+        "admin@company.com",
+        "ops@company.com"
+      ],
+      "send_on_critical_only": false
+    },
+    "webhook": {
+      "enabled": false,
+      "url": "https://hooks.company.com/healthcheck",
+      "method": "POST",
+      "headers": {
+        "Content-Type": "application/json"
+      }
+    },
+    "syslog": {
+      "enabled": false,
+      "host": "syslog.company.com",
+      "port": 514,
+      "facility": "local0"
+    }
+  },
+  
+  "monitoring": {
+    "prometheus": {
+      "enabled": false,
+      "port": 9090,
+      "path": "/metrics"
+    },
+    "rest_api": {
+      "enabled": false,
+      "port": 8080,
+      "path": "/api/v1/health"
+    }
+  },
+  
+  "checks": {
+    "_comment": "Enable/disable specific check categories",
+    "system_resources": true,
+    "database": true,
+    "server_configuration": true,
+    "agent_health": true,
+    "workload_performance": true,
+    "security": true,
+    "high_availability": false,
+    "maintenance": true
+  },
+  
+  "advanced": {
+    "parallel_checks": true,
+    "max_workers": 5,
+    "check_timeout_seconds": 300,
+    "retry_failed_checks": true,
+    "max_retries": 3,
+    "log_level": "INFO",
+    "_log_level_options": ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
+  },
+  
+  "custom_checks": {
+    "_comment": "Define custom health checks",
+    "enabled": false,
+    "scripts": [
+      {
+        "name": "Custom Database Check",
+        "script": "/opt/CA/WA_DE/healthcheck/custom/db_check.sh",
+        "timeout": 60,
+        "severity": "HIGH"
+      }
+    ]
+  }
+}
