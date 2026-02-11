@@ -12,7 +12,7 @@ import java.util.logging.*;
  * 
  * Main class that orchestrates the complete health check process.
  * This tool validates dSeries deployments against industry best practices
- * from Control-M, AutoSys, Automic, and dSeries-specific requirements.
+ * and dSeries-specific requirements.
  * 
  * Version: 1.0.0
  * Date: 2026-02-11
@@ -203,7 +203,7 @@ public class DSeriesHealthCheck {
      * Check CPU utilization (SYS-001)
      * 
      * Validates that CPU usage is within acceptable thresholds.
-     * Based on Control-M best practices: <70% normal, >85% critical
+     * Based on industry best practices: <70% normal, >85% critical
      */
     public void checkCpuUtilization() {
         LOGGER.info("Starting check: CPU Utilization (SYS-001)");
@@ -380,7 +380,7 @@ public class DSeriesHealthCheck {
      * Check disk space (SYS-003)
      * 
      * Validates that disk space is sufficient.
-     * Based on AutoSys best practices: <75% normal, >85% critical
+     * Based on industry best practices: <75% normal, >85% critical
      */
     public void checkDiskSpace() {
         LOGGER.info("Starting check: Disk Space (SYS-003)");
@@ -770,7 +770,7 @@ public class DSeriesHealthCheck {
      * Check thread pool configuration (SRV-004)
      * 
      * Provides recommendations based on workload size.
-     * Based on Control-M best practices adapted for dSeries.
+     * Based on industry best practices adapted for dSeries.
      */
     public void checkThreadPoolConfiguration() {
         LOGGER.info("Starting check: Thread Pool Configuration (SRV-004)");

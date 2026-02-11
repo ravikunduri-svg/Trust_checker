@@ -3,7 +3,7 @@
 
 **Version:** 1.0.0  
 **Date:** February 9, 2026  
-**Based on:** Control-M, AutoSys, Automic, and dSeries industry standards
+**Based on:** Industry standards and dSeries best practices
 
 ---
 
@@ -26,7 +26,7 @@
 
 ### **CPU Configuration**
 
-Based on Control-M and dSeries best practices:
+Based on industry and dSeries best practices:
 
 ```
 Minimum Requirements:
@@ -110,7 +110,7 @@ Partitioning:
 
 ### **Database Sizing**
 
-Based on AutoSys and dSeries best practices:
+Based on industry and dSeries best practices:
 
 ```
 PostgreSQL (Recommended):
@@ -222,7 +222,7 @@ High Load Configuration:
 
 ### **Thread Pool Configuration**
 
-Based on Control-M best practices, adapted for dSeries:
+Based on industry best practices, adapted for dSeries:
 
 ```
 Small Environment (0-15,000 daily jobs):
@@ -258,7 +258,7 @@ Large Environment (75,001-150,000 jobs):
 
 ### **Agent Health Verification**
 
-Based on AutoSys `autoping` concept:
+Based on industry best practices:
 
 ```
 Agent Connectivity Check:
@@ -306,7 +306,7 @@ Agent Naming Convention:
 
 ### **Queue Management**
 
-Based on Control-M and AutoSys monitoring:
+Based on industry monitoring best practices:
 
 ```
 Queue Depth Thresholds:
@@ -537,7 +537,7 @@ Application Backups:
 
 ### **Key Metrics to Monitor**
 
-Based on Control-M, AutoSys, and Automic monitoring:
+Based on industry monitoring best practices:
 
 ```
 System Metrics:
@@ -579,7 +579,7 @@ Agent Metrics:
 
 ### **Alert Configuration**
 
-Based on AutoSys alert best practices:
+Based on industry alert best practices:
 
 ```
 Alert Principles:
@@ -897,18 +897,14 @@ Level 4: Broadcom Support
 
 ### **Industry Best Practices**
 
-1. **Control-M (BMC)**
+1. **Industry Best Practices**
    - Performance tuning for small/medium/large environments
    - Thread pool configuration
    - Resource monitoring
-
-2. **AutoSys (Broadcom)**
    - Monitoring and reporting
-   - Agent health verification (autoping)
+   - Agent health verification
    - Forecast and prediction
    - Alert configuration
-
-3. **Automic Automation Engine**
    - REST API health checks
    - Process count validation
    - Active execution monitoring

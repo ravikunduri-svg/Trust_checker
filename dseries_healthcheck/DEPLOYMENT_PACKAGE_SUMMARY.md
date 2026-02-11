@@ -12,9 +12,7 @@
 
 The **ESP dSeries Health Check Tool** is a comprehensive, production-ready solution for validating dSeries deployments and ensuring adherence to industry best practices. This tool has been developed based on proven methodologies from:
 
-- **Control-M** (BMC) - Performance tuning and resource optimization
-- **AutoSys** (Broadcom) - Monitoring and agent health verification
-- **Automic Automation Engine** - Health check APIs and process validation
+- **Industry Best Practices** - Performance tuning, resource optimization, monitoring, and agent health verification
 - **dSeries Best Practices** - Deployment architecture and configuration
 
 ### **Key Benefits**
@@ -51,7 +49,7 @@ The **ESP dSeries Health Check Tool** is a comprehensive, production-ready solut
    - License status
 
 4. **Agent Health Monitoring**
-   - Connectivity verification (AutoSys autoping-style)
+   - Connectivity verification (agent ping)
    - Version compatibility
    - Resource usage on agents
    - Communication latency
@@ -189,7 +187,7 @@ Overall Score = (Passed × 100 + Warnings × 60 + Failed × 0) / Total Checks
 
 ## 🎯 Based on Industry Best Practices
 
-### **Control-M (BMC) Best Practices**
+### **Industry Best Practices - Performance & Resources**
 
 ✅ **Thread Pool Sizing**
 - Small environment (0-15K jobs): 3 download, 2 DB update threads
@@ -206,7 +204,7 @@ Overall Score = (Passed × 100 + Warnings × 60 + Failed × 0) / Total Checks
 - Application-level metrics
 - Proactive alerting
 
-### **AutoSys (Broadcom) Best Practices**
+### **Industry Best Practices - Monitoring & Agents**
 
 ✅ **Monitoring Tools**
 - Forecast reports for predictive analysis
@@ -223,7 +221,7 @@ Overall Score = (Passed × 100 + Warnings × 60 + Failed × 0) / Total Checks
 - Alert only on actionable states
 - Avoid closed/resolved state alerts
 
-### **Automic Automation Engine Best Practices**
+### **Industry Best Practices - APIs & Processes**
 
 ✅ **Health Check API**
 - Ping health check for availability

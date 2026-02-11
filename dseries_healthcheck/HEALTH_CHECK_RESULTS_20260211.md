@@ -308,7 +308,7 @@ jvmproperty_7=-XX:HeapDumpPath=C:/CA/ESPdSeriesWAServer_R12_4/logs/
 ```
 
 ### Thread Pool Configuration
-Based on Control-M best practices for medium workload:
+Based on industry best practices for medium workload:
 - Download threads: 6
 - DB Update threads: 4
 - Selector threads: 8

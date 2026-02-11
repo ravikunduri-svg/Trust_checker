@@ -32,9 +32,9 @@ This is the **Java implementation** of the ESP dSeries Workload Automation Healt
 - ✅ Security Configuration
 
 ### **Industry Best Practices**
-- ✅ Control-M (BMC) - Thread pool sizing, JVM configuration
-- ✅ AutoSys (Broadcom) - Agent health verification, monitoring
-- ✅ Automic - Health check APIs, process validation
+- ✅ Thread pool sizing and JVM configuration
+- ✅ Agent health verification and monitoring
+- ✅ Health check APIs and process validation
 - ✅ dSeries - JVM heap (4GB minimum), configuration
 
 ### **Reporting**

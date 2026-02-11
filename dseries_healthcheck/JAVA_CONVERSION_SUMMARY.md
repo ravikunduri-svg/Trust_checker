@@ -70,7 +70,7 @@ I've successfully converted the Python health check tool to a **comprehensive, e
  * Check CPU utilization (SYS-001)
  * 
  * Validates that CPU usage is within acceptable thresholds.
- * Based on Control-M best practices: <70% normal, >85% critical
+ * Based on industry best practices: <70% normal, >85% critical
  */
 public void checkCpuUtilization() {
     LOGGER.info("Starting check: CPU Utilization (SYS-001)");
@@ -379,7 +379,7 @@ Comprehensive documentation covering:
  * Check CPU utilization (SYS-001)
  * 
  * Validates that CPU usage is within acceptable thresholds.
- * Based on Control-M best practices: <70% normal, >85% critical
+ * Based on industry best practices: <70% normal, >85% critical
  * 
  * This check uses Java's OperatingSystemMXBean to get CPU load.
  * The load is compared against configurable warning and critical thresholds.

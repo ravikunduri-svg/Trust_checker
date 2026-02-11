@@ -8,7 +8,7 @@
 
 ## 📋 Overview
 
-Comprehensive health check tool for ESP dSeries Workload Automation based on industry best practices from Control-M, AutoSys, Automic, and dSeries-specific requirements.
+Comprehensive health check tool for ESP dSeries Workload Automation based on industry best practices and dSeries-specific requirements.
 
 ### **Purpose**
 
@@ -218,21 +218,17 @@ TREND_DB_FILE=/var/log/dseries/healthcheck/trends.db
 
 ## 🎯 Best Practices Validated
 
-### **From Control-M**
+### **Industry Best Practices**
 ✅ Thread pool sizing based on workload  
 ✅ Database connection optimization  
 ✅ JVM heap configuration  
 ✅ Resource monitoring  
 ✅ Alert configuration  
-
-### **From AutoSys**
 ✅ Forecast and prediction capabilities  
 ✅ Event monitoring  
 ✅ Agent health verification  
 ✅ High availability configuration  
 ✅ Test environment validation  
-
-### **From Automic**
 ✅ REST API health checks  
 ✅ Process count validation  
 ✅ Active execution monitoring  
@@ -415,9 +411,9 @@ df -h /var/log
 ## 📚 References
 
 ### **Industry Best Practices**
-- Control-M Performance Tuning Guide
-- AutoSys Monitoring and Reporting
-- Automic Health Check API
+- Workload Automation Performance Tuning
+- Enterprise Monitoring and Reporting
+- Health Check API Standards
 - dSeries Deployment Architecture
 
 ### **Documentation**

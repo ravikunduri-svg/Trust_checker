@@ -50,7 +50,7 @@
 - Health score interpretation
 - Configuration overview
 - Output reports (HTML, JSON)
-- Best practices validated (Control-M, AutoSys, Automic, dSeries)
+- Best practices validated (Industry standards and dSeries)
 - Detailed check reference
 - Troubleshooting guide
 - Recommended schedule
@@ -202,7 +202,7 @@
 - Package contents
 - Quick start (5 minutes)
 - Health check categories
-- Industry best practices (Control-M, AutoSys, Automic)
+- Industry best practices (Workload automation standards)
 - Technical specifications
 - Sample output
 - Training & support
@@ -231,7 +231,7 @@
 
 **Highlights:**
 - ✅ Production-ready, no development needed
-- ✅ Based on Control-M, AutoSys, Automic best practices
+- ✅ Based on industry best practices
 - ✅ 50+ health checks
 - ✅ ROI: $69,000 per deployment
 - ✅ 100+ pages of documentation

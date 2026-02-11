@@ -218,8 +218,8 @@ psql -h localhost -p 5432 -U wauser -d WADB -c "SELECT * FROM pg_stat_statements
 
 ### **Agent Issues**
 ```bash
-# Ping agent (AutoSys style)
-# Implement dSeries equivalent of autoping
+# Ping agent
+# Implement dSeries agent health check
 
 # Check agent logs
 tail -f /var/log/dseries/agent/*.log

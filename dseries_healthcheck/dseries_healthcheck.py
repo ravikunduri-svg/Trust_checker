@@ -4,11 +4,7 @@ ESP dSeries Workload Automation Health Check Tool
 Version: 1.0.0
 Date: 2026-02-09
 
-Comprehensive health check based on best practices from:
-- Control-M (BMC)
-- AutoSys (Broadcom)
-- Automic Automation Engine
-- dSeries specific requirements
+Comprehensive health check based on industry best practices and dSeries specific requirements
 
 Usage:
     python dseries_healthcheck.py --quick
@@ -118,7 +114,7 @@ class dSeriesHealthCheck:
             'max_failed_jobs_percent': 5,
             'max_db_query_time_ms': 500,
             
-            # Workload sizing (based on Control-M best practices)
+            # Workload sizing (based on industry best practices)
             'workload_size': 'medium',  # small, medium, large
             'daily_jobs_count': 50000,
             
@@ -508,13 +504,13 @@ class dSeriesHealthCheck:
             ))
     
     def check_thread_pool_configuration(self):
-        """Check thread pool configuration (SRV-004) - Based on Control-M best practices"""
+        """Check thread pool configuration (SRV-004) - Based on industry best practices"""
         try:
             # Determine recommended thread counts based on workload size
             workload_size = self.config.get('workload_size', 'medium')
             daily_jobs = self.config.get('daily_jobs_count', 50000)
             
-            # Based on Control-M best practices
+            # Based on industry best practices
             if daily_jobs <= 15000:
                 workload_size = 'small'
                 recommended_threads = {'download': 3, 'db_update': 2, 'selector': 4}
@@ -554,7 +550,7 @@ class dSeriesHealthCheck:
     # =========================================================================
     
     def check_process_count(self):
-        """Check minimum required processes (Based on Automic best practices)"""
+        """Check minimum required processes (Based on industry best practices)"""
         try:
             # This would check for dSeries-specific processes
             # For now, provide framework

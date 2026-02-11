@@ -328,7 +328,7 @@ db.name=dseries
 db.user=postgres
 db.connection.timeout.seconds=5
 
-# Workload Sizing (based on Control-M best practices)
+# Workload Sizing (based on industry best practices)
 workload.size=medium
 workload.daily.jobs=50000
 

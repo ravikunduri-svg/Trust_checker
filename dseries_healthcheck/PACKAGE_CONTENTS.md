@@ -77,9 +77,7 @@ High Availability:       4 checks
 ### **Best Practices Covered**
 
 ```
-Control-M:              ✅ 10+ best practices
-AutoSys:                ✅ 8+ best practices
-Automic:                ✅ 6+ best practices
+Industry Standards:     ✅ 24+ best practices
 dSeries Specific:       ✅ 12+ best practices
 Total:                  36+ industry best practices
 ```
@@ -453,7 +451,7 @@ Total:                  36+ industry best practices
 - Multiple database support (PostgreSQL, Oracle, SQL Server)
 - HTML and JSON reporting
 - Comprehensive documentation (100+ pages)
-- Based on Control-M, AutoSys, Automic, and dSeries best practices
+- Based on industry standards and dSeries best practices
 - Production-ready and fully tested
 
 **Features:**

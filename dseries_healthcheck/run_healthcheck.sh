@@ -5,7 +5,7 @@
 # Date: 2026-02-09
 #
 # Purpose: Comprehensive health check for dSeries deployments
-# Based on: Control-M, AutoSys, Automic, and dSeries best practices
+# Based on: Industry and dSeries best practices
 ################################################################################
 
 # Script directory

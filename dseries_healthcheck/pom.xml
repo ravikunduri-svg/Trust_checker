@@ -13,7 +13,7 @@
     <name>ESP dSeries Health Check Tool</name>
     <description>
         Comprehensive health check tool for ESP dSeries Workload Automation
-        based on industry best practices from Control-M, AutoSys, and Automic.
+        based on industry best practices and dSeries-specific requirements.
     </description>
 
     <properties>

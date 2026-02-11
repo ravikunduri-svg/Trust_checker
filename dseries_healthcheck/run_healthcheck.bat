@@ -5,7 +5,7 @@ REM Version: 1.0.0
 REM Date: 2026-02-09
 REM
 REM Purpose: Comprehensive health check for dSeries deployments on Windows
-REM Based on: Control-M, AutoSys, Automic, and dSeries best practices
+REM Based on: Industry and dSeries best practices
 REM ============================================================================
 
 setlocal enabledelayedexpansion
