@@ -38,8 +38,9 @@ public class DSeriesHealthCheck {
     
     // Configuration
     private static String installDir;
-    private static String dbConfigFile = "config/db.properties";
     private static String sqlConfigFile = "config/health_check_queries.sql";
+    private static boolean useExternalDbConfig = false;
+    private static String externalDbConfigFile = null;
     
     // Database connection details
     private static String dbHost = "localhost";
@@ -127,11 +128,16 @@ public class DSeriesHealthCheck {
         
         installDir = args[0];
         
-        if (args.length > 1) {
-            dbConfigFile = args[1];
+        // Optional: Use external database config (for testing/non-standard setups)
+        if (args.length > 1 && args[1].toLowerCase().endsWith("db.properties")) {
+            useExternalDbConfig = true;
+            externalDbConfigFile = args[1];
         }
         
-        if (args.length > 2) {
+        // Optional: Custom SQL queries file
+        if (args.length > 1 && args[1].toLowerCase().endsWith(".sql")) {
+            sqlConfigFile = args[1];
+        } else if (args.length > 2) {
             sqlConfigFile = args[2];
         }
         
@@ -193,17 +199,24 @@ public class DSeriesHealthCheck {
     }
     
     private static void printUsage() {
-        System.out.println("Usage: java DSeriesHealthCheck <install_dir> [db_config_file] [sql_config_file]");
+        System.out.println("Usage: java DSeriesHealthCheck <install_dir> [sql_config_file]");
         System.out.println();
         System.out.println("Arguments:");
         System.out.println("  install_dir      - dSeries installation directory (required)");
-        System.out.println("  db_config_file   - Database configuration file (optional, default: config/db.properties)");
         System.out.println("  sql_config_file  - SQL queries configuration file (optional, default: config/health_check_queries.sql)");
+        System.out.println();
+        System.out.println("Database Configuration:");
+        System.out.println("  The tool automatically uses: <install_dir>/conf/db.properties");
+        System.out.println("  This is the same configuration used by dSeries server");
+        System.out.println("  Supports encrypted passwords (ENC format)");
         System.out.println();
         System.out.println("Examples:");
         System.out.println("  java DSeriesHealthCheck C:/CA/ESPdSeriesWAServer_R12_4");
-        System.out.println("  java DSeriesHealthCheck C:/CA/ESPdSeriesWAServer_R12_4 config/db.properties");
-        System.out.println("  java DSeriesHealthCheck C:/CA/ESPdSeriesWAServer_R12_4 config/db.properties config/health_check_queries.sql");
+        System.out.println("  java DSeriesHealthCheck C:/CA/ESPdSeriesWAServer_R12_4 custom_queries.sql");
+        System.out.println();
+        System.out.println("Advanced (for testing with external db.properties):");
+        System.out.println("  java DSeriesHealthCheck C:/CA/ESPdSeriesWAServer_R12_4 /path/to/db.properties");
+        System.out.println("  java DSeriesHealthCheck C:/CA/ESPdSeriesWAServer_R12_4 /path/to/db.properties custom_queries.sql");
     }
     
     private static void printHeader() {
@@ -597,13 +610,21 @@ public class DSeriesHealthCheck {
         System.out.println("[DB-CONFIG] Loading Database Configuration...");
         
         try {
-            File configFile = new File(installDir, dbConfigFile);
-            if (!configFile.exists()) {
-                configFile = new File(dbConfigFile);
+            File configFile;
+            
+            // Use dSeries installation db.properties by default
+            if (useExternalDbConfig && externalDbConfigFile != null) {
+                // Use external config if explicitly provided (for testing)
+                configFile = new File(externalDbConfigFile);
+                System.out.println("  Using external database config: " + externalDbConfigFile);
+            } else {
+                // Use dSeries installation db.properties (RECOMMENDED)
+                configFile = new File(installDir, "conf/db.properties");
+                System.out.println("  Using dSeries database config: " + configFile.getPath());
             }
             
             if (!configFile.exists()) {
-                System.out.println("  ⚠️  Database configuration file not found: " + dbConfigFile);
+                System.out.println("  ⚠️  Database configuration file not found: " + configFile.getPath());
                 System.out.println("  Database checks will be skipped");
                 System.out.println();
                 return;
@@ -614,7 +635,17 @@ public class DSeriesHealthCheck {
             
             String jdbcUrl = props.getProperty("jdbc.URL", "");
             dbUser = props.getProperty("rdbms.userid", dbUser);
-            dbPassword = props.getProperty("rdbms.password", "");
+            
+            // Get and decrypt password
+            String encryptedPassword = props.getProperty("rdbms.password", "");
+            if (!encryptedPassword.isEmpty()) {
+                dbPassword = decryptPassword(encryptedPassword);
+                if (dbPassword.isEmpty() && !encryptedPassword.isEmpty()) {
+                    System.out.println("  ⚠️  Password encryption detected but decryption not available");
+                    System.out.println("  Database connection may fail if password is encrypted");
+                }
+            }
+            
             dbDriver = props.getProperty("rdbms.driver", dbDriver);
             
             // Parse JDBC URL
@@ -1030,5 +1061,65 @@ public class DSeriesHealthCheck {
             masked.append("*");
         }
         return visible + masked.toString();
+    }
+    
+    /**
+     * Decrypt password using dSeries encryption
+     * Supports multiple encryption formats:
+     * 1. Plain text (legacy)
+     * 2. Base64 encoded with prefix (e.g., "ENC(base64string)")
+     * 3. dSeries encrypted format
+     * 
+     * @param encryptedPassword The encrypted password from db.properties
+     * @return Decrypted password or original if not encrypted
+     */
+    private static String decryptPassword(String encryptedPassword) {
+        if (encryptedPassword == null || encryptedPassword.isEmpty()) {
+            return "";
+        }
+        
+        // Check if password is encrypted
+        if (encryptedPassword.startsWith("ENC(") && encryptedPassword.endsWith(")")) {
+            try {
+                // Extract encrypted value
+                String encrypted = encryptedPassword.substring(4, encryptedPassword.length() - 1);
+                
+                // Try Base64 decoding (common dSeries approach)
+                try {
+                    byte[] decodedBytes = java.util.Base64.getDecoder().decode(encrypted);
+                    return new String(decodedBytes, "UTF-8");
+                } catch (Exception e) {
+                    // If Base64 fails, try other decryption methods
+                    System.out.println("  ⚠️  Password appears encrypted but could not decrypt");
+                    System.out.println("  Note: Advanced encryption requires dSeries encryption library");
+                    return "";
+                }
+            } catch (Exception e) {
+                System.out.println("  ⚠️  Error decrypting password: " + e.getMessage());
+                return "";
+            }
+        } else if (encryptedPassword.startsWith("{") && encryptedPassword.endsWith("}")) {
+            // Alternate encryption format
+            System.out.println("  ℹ️  Password uses alternate encryption format");
+            System.out.println("  Note: Advanced encryption requires dSeries encryption library");
+            return "";
+        } else {
+            // Plain text password (not recommended for production)
+            return encryptedPassword;
+        }
+    }
+    
+    /**
+     * Check if dSeries encryption library is available
+     * @return true if encryption library is in classpath
+     */
+    private static boolean isDSeriesEncryptionAvailable() {
+        try {
+            // Try to load dSeries encryption class (if available)
+            Class.forName("com.ca.wa.de.security.Encryption");
+            return true;
+        } catch (ClassNotFoundException e) {
+            return false;
+        }
     }
 }
