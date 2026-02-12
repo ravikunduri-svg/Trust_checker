@@ -1,8 +1,8 @@
 -- ============================================================================
 -- dSeries Health Check SQL Queries Configuration
 -- ============================================================================
--- Version: 1.0.0
--- Date: 2026-02-11
+-- Version: 1.1.0
+-- Date: 2026-02-12
 --
 -- This file contains all SQL queries used by the health check tool.
 -- Users can add custom queries by following the format below.
@@ -19,6 +19,22 @@
 -- SELECT ... your query here ...;
 --
 -- IMPORTANT: Do not include sensitive data (passwords, credentials, etc.)
+--
+-- DATABASE-SPECIFIC SYNTAX NOTES:
+-- ================================
+-- String Concatenation:
+--   PostgreSQL, Oracle, DB2: Use || operator
+--   SQL Server: Use + operator
+--   Example: 'text' || column_name || 'text'
+--
+-- Date/Time Functions:
+--   PostgreSQL: CURRENT_TIMESTAMP, INTERVAL '1 hour'
+--   Oracle: SYSDATE, INTERVAL '1' HOUR
+--   SQL Server: GETDATE(), DATEADD(HOUR, -1, GETDATE())
+--   DB2: CURRENT TIMESTAMP, CURRENT TIMESTAMP - 1 HOUR
+--
+-- IMPORTANT: This file uses PostgreSQL syntax by default.
+-- Modify queries if using a different database type.
 -- ============================================================================
 
 -- ============================================================================
@@ -130,7 +146,7 @@ FROM ESP_RTWOB
 WHERE NOT EXISTS (
     SELECT 1 
     FROM ESP_APPLICATION APPL 
-    WHERE ESP_RTWOB.APPLID LIKE '%' + APPL.appl_name + '%' 
+    WHERE ESP_RTWOB.APPLID LIKE '%' || APPL.appl_name || '%' 
     AND ESP_RTWOB.GENERATION = APPL.appl_gen_no
 );
 
@@ -146,7 +162,7 @@ WHERE NOT EXISTS (
 -- @THRESHOLD_OPERATOR: >
 -- @THRESHOLD_VALUE: 0
 -- @REMEDIATION: Verify agent connectivity if no agents connected
-SELECT COUNT(*) as total_agents FROM ESP_AGENT WHERE STATUS = 'ACTIVE';
+SELECT COUNT(*) as total_agents FROM esp_agent_rp WHERE STATUS = 'ACTIVE';
 
 -- @CHECK_ID: AG-002
 -- @CHECK_NAME: Disconnected Agents
@@ -156,7 +172,7 @@ SELECT COUNT(*) as total_agents FROM ESP_AGENT WHERE STATUS = 'ACTIVE';
 -- @THRESHOLD_OPERATOR: =
 -- @THRESHOLD_VALUE: 0
 -- @REMEDIATION: Check agent logs and network connectivity
-SELECT COUNT(*) as disconnected_agents FROM ESP_AGENT WHERE STATUS != 'ACTIVE';
+SELECT COUNT(*) as disconnected_agents FROM esp_agent_rp WHERE STATUS != 'ACTIVE';
 
 -- @CHECK_ID: AG-003
 -- @CHECK_NAME: Agent Version Compatibility
@@ -167,7 +183,7 @@ SELECT COUNT(*) as disconnected_agents FROM ESP_AGENT WHERE STATUS != 'ACTIVE';
 -- @THRESHOLD_VALUE: 0
 -- @REMEDIATION: Upgrade agents to match server version
 SELECT COUNT(*) as outdated_agents 
-FROM ESP_AGENT 
+FROM esp_agent_rp 
 WHERE VERSION < (SELECT VERSION FROM ESP_SERVER_INFO);
 
 -- ============================================================================
@@ -209,7 +225,6 @@ AND TIMESTAMP > CURRENT_TIMESTAMP - INTERVAL '1 hour';
 -- @THRESHOLD_OPERATOR: =
 -- @THRESHOLD_VALUE: ACTIVE
 -- @REMEDIATION: Review HA configuration and ensure all nodes are operational
-SELECT HA_MODE as ha_status FROM ESP_SERVER_CONFIG WHERE CONFIG_KEY = 'HA_MODE';
 
 -- @CHECK_ID: HA-002
 -- @CHECK_NAME: HA Node Status
@@ -219,9 +234,6 @@ SELECT HA_MODE as ha_status FROM ESP_SERVER_CONFIG WHERE CONFIG_KEY = 'HA_MODE';
 -- @THRESHOLD_OPERATOR: ALL_ACTIVE
 -- @THRESHOLD_VALUE: true
 -- @REMEDIATION: Investigate and restart failed nodes
-SELECT NODE_NAME, STATUS, LAST_HEARTBEAT 
-FROM ESP_HA_NODES 
-ORDER BY NODE_NAME;
 
 -- @CHECK_ID: HA-003
 -- @CHECK_NAME: HA Failover History
@@ -231,9 +243,6 @@ ORDER BY NODE_NAME;
 -- @THRESHOLD_OPERATOR: <
 -- @THRESHOLD_VALUE: 5
 -- @REMEDIATION: Investigate frequent failovers
-SELECT COUNT(*) as failover_count 
-FROM ESP_HA_FAILOVER_LOG 
-WHERE TIMESTAMP > CURRENT_TIMESTAMP - INTERVAL '24 hours';
 
 -- ============================================================================
 -- SECTION 6: PERFORMANCE METRICS
@@ -275,110 +284,6 @@ FROM ESP_GENERIC_JOB
 WHERE STATUS = 'FAILED' 
 AND END_TIME > CURRENT_TIMESTAMP - INTERVAL '24 hours';
 
--- @CHECK_ID: PERF-004
--- @CHECK_NAME: Database Connection Pool Usage
--- @CHECK_CATEGORY: Performance
--- @SEVERITY: WARNING
--- @DESCRIPTION: Check database connection pool utilization
--- @THRESHOLD_OPERATOR: <
--- @THRESHOLD_VALUE: 90
--- @REMEDIATION: Increase connection pool size if consistently high
-SELECT 
-    (CAST(ACTIVE_CONNECTIONS AS FLOAT) / MAX_CONNECTIONS * 100) as pool_usage_percent
-FROM ESP_DB_POOL_STATS;
-
--- ============================================================================
--- SECTION 7: HOUSEKEEPING CHECKS
--- ============================================================================
-
--- @CHECK_ID: HK-001
--- @CHECK_NAME: Last Housekeeping Run
--- @CHECK_CATEGORY: Housekeeping
--- @SEVERITY: WARNING
--- @DESCRIPTION: Check when housekeeping was last executed
--- @THRESHOLD_OPERATOR: <
--- @THRESHOLD_VALUE: 7
--- @REMEDIATION: Schedule and run housekeeping application
-SELECT 
-    EXTRACT(DAY FROM (CURRENT_TIMESTAMP - MAX(RUN_TIME))) as days_since_housekeeping
-FROM ESP_HOUSEKEEPING_LOG;
-
--- @CHECK_ID: HK-002
--- @CHECK_NAME: Housekeeping Success Rate
--- @CHECK_CATEGORY: Housekeeping
--- @SEVERITY: WARNING
--- @DESCRIPTION: Check housekeeping success rate
--- @THRESHOLD_OPERATOR: >
--- @THRESHOLD_VALUE: 90
--- @REMEDIATION: Investigate housekeeping failures
-SELECT 
-    (CAST(SUM(CASE WHEN STATUS = 'SUCCESS' THEN 1 ELSE 0 END) AS FLOAT) / COUNT(*) * 100) as success_rate
-FROM ESP_HOUSEKEEPING_LOG
-WHERE RUN_TIME > CURRENT_TIMESTAMP - INTERVAL '30 days';
-
--- ============================================================================
--- SECTION 8: VERSION AND COMPONENT CHECKS
--- ============================================================================
-
--- @CHECK_ID: VER-001
--- @CHECK_NAME: dSeries Version
--- @CHECK_CATEGORY: Version
--- @SEVERITY: INFO
--- @DESCRIPTION: Get current dSeries version
--- @THRESHOLD_OPERATOR: INFO_ONLY
--- @THRESHOLD_VALUE: N/A
--- @REMEDIATION: Consider upgrading to latest version for new features
-SELECT VERSION, BUILD_NUMBER, INSTALL_DATE 
-FROM ESP_SERVER_INFO;
-
--- @CHECK_ID: VER-002
--- @CHECK_NAME: Installed Components
--- @CHECK_CATEGORY: Version
--- @SEVERITY: INFO
--- @DESCRIPTION: List all installed components
--- @THRESHOLD_OPERATOR: INFO_ONLY
--- @THRESHOLD_VALUE: N/A
--- @REMEDIATION: N/A - Informational only
-SELECT COMPONENT_NAME, VERSION, STATUS 
-FROM ESP_COMPONENTS 
-ORDER BY COMPONENT_NAME;
-
--- ============================================================================
--- SECTION 9: MIGRATION AND DEPLOYMENT CHECKS
--- ============================================================================
-
--- @CHECK_ID: MIG-001
--- @CHECK_NAME: Recent Migrations
--- @CHECK_CATEGORY: Migration
--- @SEVERITY: INFO
--- @DESCRIPTION: Check recent migration activities
--- @THRESHOLD_OPERATOR: INFO_ONLY
--- @THRESHOLD_VALUE: N/A
--- @REMEDIATION: N/A - Informational only
-SELECT 
-    MIGRATION_ID, 
-    SOURCE_ENV, 
-    TARGET_ENV, 
-    STATUS, 
-    MIGRATION_DATE 
-FROM ESP_MIGRATION_LOG 
-WHERE MIGRATION_DATE > CURRENT_TIMESTAMP - INTERVAL '30 days'
-ORDER BY MIGRATION_DATE DESC;
-
--- @CHECK_ID: MIG-002
--- @CHECK_NAME: UAT to Production Migrations
--- @CHECK_CATEGORY: Migration
--- @SEVERITY: INFO
--- @DESCRIPTION: Track UAT to Production migrations
--- @THRESHOLD_OPERATOR: INFO_ONLY
--- @THRESHOLD_VALUE: N/A
--- @REMEDIATION: Use imexutil for artifact migration
-SELECT COUNT(*) as uat_to_prod_migrations
-FROM ESP_MIGRATION_LOG 
-WHERE SOURCE_ENV = 'UAT' 
-AND TARGET_ENV = 'PRODUCTION'
-AND MIGRATION_DATE > CURRENT_TIMESTAMP - INTERVAL '90 days';
-
 -- ============================================================================
 -- SECTION 10: CUSTOM QUERIES (Add your own queries below)
 -- ============================================================================
@@ -393,7 +298,44 @@ AND MIGRATION_DATE > CURRENT_TIMESTAMP - INTERVAL '90 days';
 -- @THRESHOLD_VALUE: 0
 -- @REMEDIATION: What to do if check fails
 -- SELECT COUNT(*) as custom_metric FROM YOUR_TABLE WHERE YOUR_CONDITION;
-
+SELECT 
+    time_slots.slot_time as timestamp,
+    EXTRACT(HOUR FROM time_slots.slot_time)::int as hour,
+    EXTRACT(DOW FROM time_slots.slot_time)::int as day_of_week,
+    COALESCE(job_counts.jobs_run, 0) as jobs_run,
+    COALESCE(job_counts.avg_runtime, 0) as avg_runtime
+FROM (
+    -- Generate hourly slots for the last N days
+    SELECT generate_series(
+        DATE_TRUNC('hour', NOW() - INTERVAL '30 days'),
+        DATE_TRUNC('hour', NOW() - INTERVAL '1 hour'),
+        INTERVAL '1 hour'
+    ) as slot_time
+) time_slots
+LEFT JOIN (
+    -- Aggregate jobs per hour
+    SELECT 
+        DATE_TRUNC('hour', all_jobs.start_date_time) as slot_time,
+        COUNT(*) as jobs_run,
+        AVG(CASE 
+            WHEN all_jobs.end_date_time IS NOT NULL AND all_jobs.start_date_time IS NOT NULL 
+            THEN EXTRACT(EPOCH FROM (all_jobs.end_date_time - all_jobs.start_date_time))/60 
+            ELSE 0 
+        END) as avg_runtime
+    FROM (
+        SELECT start_date_time, end_date_time
+        FROM esp_generic_job
+        WHERE start_date_time >= NOW() - INTERVAL '30 days'
+          AND start_date_time IS NOT NULL
+        UNION ALL
+        SELECT start_date_time, end_date_time
+        FROM h_generic_job
+        WHERE start_date_time >= NOW() - INTERVAL '30 days'
+          AND start_date_time IS NOT NULL
+    ) all_jobs
+    GROUP BY DATE_TRUNC('hour', all_jobs.start_date_time)
+) job_counts ON time_slots.slot_time = job_counts.slot_time
+ORDER BY time_slots.slot_time
 -- ============================================================================
 -- END OF CONFIGURATION
 -- ============================================================================
