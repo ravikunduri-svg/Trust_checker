@@ -1,0 +1,44 @@
+# ============================================================================
+# dSeries Database Configuration Template
+# ============================================================================
+# Copy this file to db.properties and update with your database details
+# 
+# IMPORTANT: Do NOT commit db.properties with actual credentials to git
+# ============================================================================
+
+# Database Connection URL
+# Format for PostgreSQL: jdbc:postgresql://hostname:port/database_name
+# Format for Oracle: jdbc:oracle:thin:@hostname:port:sid
+# Format for SQL Server: jdbc:sqlserver://hostname:port;databaseName=database_name
+jdbc.URL=jdbc:postgresql://localhost:5432/dseries
+
+# Database User (do not use privileged accounts)
+rdbms.userid=dseries_user
+
+# Database Password (leave empty, will be prompted or use secure vault)
+rdbms.password=
+
+# JDBC Driver Class
+# PostgreSQL: org.postgresql.Driver
+# Oracle: oracle.jdbc.driver.OracleDriver
+# SQL Server: com.microsoft.sqlserver.jdbc.SQLServerDriver
+rdbms.driver=org.postgresql.Driver
+
+# Database Schema (optional)
+rdbms.schema=public
+
+# Connection Pool Settings
+jdbc.pool.minSize=10
+jdbc.pool.maxSize=100
+jdbc.pool.timeout=30000
+
+# ============================================================================
+# Security Notes:
+# ============================================================================
+# 1. Never store passwords in plain text
+# 2. Use environment variables or secure vaults for sensitive data
+# 3. Restrict file permissions: chmod 600 db.properties
+# 4. Add db.properties to .gitignore
+# 5. Use read-only database accounts for health checks
+# 6. Enable SSL/TLS for database connections in production
+# ============================================================================
