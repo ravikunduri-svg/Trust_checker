@@ -4,6 +4,9 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.regex.*;
 import java.util.Date;
+import javax.xml.parsers.*;
+import org.w3c.dom.*;
+import java.security.GeneralSecurityException;
 
 /**
  * ESP dSeries Workload Automation Health Check Tool - Enhanced Version
@@ -64,6 +67,7 @@ public class DSeriesHealthCheck {
     private static String sqlConfigFile = "config/health_check_queries.sql";
     private static boolean useExternalDbConfig = false;
     private static String externalDbConfigFile = null;
+    private static int serverPort = 7599; // Default, will be read from instanceconf.xml
     
     // Database connection details
     private static String dbHost = "localhost";
@@ -528,21 +532,8 @@ public class DSeriesHealthCheck {
         totalChecks++;
         
         try {
-            int serverPort = 7599;  // Default port
-            
-            // Try to read port from configuration
-            File propsFile = new File(installDir, "conf/server.properties");
-            if (propsFile.exists()) {
-                BufferedReader reader = new BufferedReader(new FileReader(propsFile));
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    if (line.startsWith("server.port=")) {
-                        serverPort = Integer.parseInt(line.substring("server.port=".length()).trim());
-                        break;
-                    }
-                }
-                reader.close();
-            }
+            // Read port from instanceconf.xml (rmi.registry.port)
+            serverPort = readServerPort();
             
             // Try to connect to port
             java.net.Socket socket = null;
@@ -1416,10 +1407,17 @@ public class DSeriesHealthCheck {
             return "";
         }
         
-        // Try dSeries native decryption first (handles all dSeries formats)
+        // Try dSeries Scrambler first (used by DBConnectionValidator)
+        System.out.println("  ℹ️  Attempting password decryption using dSeries Scrambler");
+        String decrypted = decryptPasswordWithScrambler(encryptedPassword);
+        if (!decrypted.isEmpty()) {
+            return decrypted;
+        }
+        
+        // Try dSeries Encryption class as fallback
         if (isDSeriesEncryptionAvailable()) {
             try {
-                System.out.println("  ℹ️  Using dSeries native encryption library for password decryption");
+                System.out.println("  ℹ️  Trying dSeries Encryption class for password decryption");
                 
                 // Use reflection to call dSeries encryption
                 Class<?> encryptionClass = Class.forName("com.ca.wa.de.security.Encryption");
@@ -1427,11 +1425,11 @@ public class DSeriesHealthCheck {
                 Object result = decryptMethod.invoke(null, encryptedPassword);
                 
                 if (result != null && !result.toString().isEmpty()) {
-                    System.out.println("  ✅ Password decrypted successfully using dSeries encryption");
+                    System.out.println("  ✅ Password decrypted successfully using dSeries Encryption");
                     return result.toString();
                 }
             } catch (Exception e) {
-                System.out.println("  ⚠️  dSeries decryption failed: " + e.getMessage());
+                System.out.println("  ⚠️  dSeries Encryption decryption failed: " + e.getMessage());
                 // Fall through to try other methods
             }
         }
@@ -1681,5 +1679,103 @@ public class DSeriesHealthCheck {
         } catch (Exception e) {
             return false;
         }
+    }
+    
+    /**
+     * Read server port from instanceconf.xml
+     * Reads rmi.registry.port from conf/DBInit/Config/instanceconf.xml
+     * 
+     * @return server port or default 7599 if not found
+     */
+    private static int readServerPort() {
+        try {
+            File instanceConfFile = new File(installDir, "conf/DBInit/Config/instanceconf.xml");
+            
+            if (!instanceConfFile.exists()) {
+                System.out.println("  ⚠️  instanceconf.xml not found, using default port 7599");
+                return 7599;
+            }
+            
+            DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+            DocumentBuilder builder = factory.newDocumentBuilder();
+            Document doc = builder.parse(instanceConfFile);
+            
+            // Normalize the XML structure
+            doc.getDocumentElement().normalize();
+            
+            // Get all entry elements
+            NodeList entryList = doc.getElementsByTagName("entry");
+            
+            for (int i = 0; i < entryList.getLength(); i++) {
+                Node entryNode = entryList.item(i);
+                
+                if (entryNode.getNodeType() == Node.ELEMENT_NODE) {
+                    Element entryElement = (Element) entryNode;
+                    
+                    // Get the key element
+                    NodeList keyList = entryElement.getElementsByTagName("key");
+                    if (keyList.getLength() > 0) {
+                        String key = keyList.item(0).getTextContent();
+                        
+                        // Look for rmi.registry.port
+                        if ("rmi.registry.port".equals(key)) {
+                            // Get the desired value
+                            NodeList valueObjectList = entryElement.getElementsByTagName("valueobject");
+                            if (valueObjectList.getLength() > 0) {
+                                Element valueObject = (Element) valueObjectList.item(0);
+                                NodeList desiredList = valueObject.getElementsByTagName("desired");
+                                if (desiredList.getLength() > 0) {
+                                    String portStr = desiredList.item(0).getTextContent();
+                                    int port = Integer.parseInt(portStr.trim());
+                                    System.out.println("  ℹ️  Server port from instanceconf.xml: " + port);
+                                    return port;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            System.out.println("  ⚠️  rmi.registry.port not found in instanceconf.xml, using default 7599");
+            return 7599;
+            
+        } catch (Exception e) {
+            System.out.println("  ⚠️  Error reading instanceconf.xml: " + e.getMessage());
+            System.out.println("  Using default port 7599");
+            return 7599;
+        }
+    }
+    
+    /**
+     * Decrypt password using dSeries Scrambler with RelationalDatabaseManager key
+     * This is the exact method used by dSeries DBConnectionValidator
+     * 
+     * @param encryptedPassword The encrypted password
+     * @return Decrypted password or empty string if decryption fails
+     */
+    private static String decryptPasswordWithScrambler(String encryptedPassword) {
+        try {
+            // Use reflection to call Scrambler.recover(password, "RelationalDatabaseManager")
+            Class<?> scramblerClass = Class.forName("com.ca.wa.publiclibrary.engine.library.crypto.Scrambler");
+            java.lang.reflect.Method recoverMethod = scramblerClass.getMethod("recover", String.class, String.class);
+            Object result = recoverMethod.invoke(null, encryptedPassword, "RelationalDatabaseManager");
+            
+            if (result != null) {
+                System.out.println("  ✅ Password decrypted successfully using dSeries Scrambler");
+                return result.toString();
+            }
+        } catch (ClassNotFoundException e) {
+            System.out.println("  ⚠️  Scrambler class not found in classpath");
+            System.out.println("  Note: Ensure dSeries libraries are in classpath (use launcher scripts)");
+        } catch (NoSuchMethodException e) {
+            System.out.println("  ⚠️  Scrambler.recover method not found");
+        } catch (Exception e) {
+            System.out.println("  ⚠️  Scrambler decryption failed: " + e.getMessage());
+            if (e.getCause() != null) {
+                System.out.println("  Cause: " + e.getCause().getMessage());
+            }
+        }
+        
+        return "";
     }
 }
