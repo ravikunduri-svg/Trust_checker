@@ -40,6 +40,20 @@ The dSeries Health Check Tool performs comprehensive validation of your dSeries 
 
 ---
 
+## 🔧 Automatic Features
+
+The tool handles everything automatically - no configuration needed:
+
+- ✅ **Finds Java** - Uses dSeries bundled Java or system Java
+- ✅ **Builds Classpath** - Includes all dSeries libraries (lib, third-party, ext)
+- ✅ **Loads JDBC Drivers** - Automatically detects PostgreSQL, Oracle, SQL Server drivers
+- ✅ **Reads Configuration** - Uses existing dSeries config files (db.properties, server.properties)
+- ✅ **Decrypts Passwords** - Handles encrypted database passwords (ENC format)
+- ✅ **Generates Report** - Creates detailed health check report with recommendations
+- ✅ **Masks Sensitive Data** - Protects credentials and hostnames in output
+
+---
+
 ## 📦 What's Included
 
 ```
@@ -364,7 +378,60 @@ This does not appear to be a valid dSeries installation
 
 ---
 
-### Issue 5: Database Connection Failed
+### Issue 5: JDBC Driver Not Found
+
+**Error:**
+```
+⚠️  JDBC driver not found in classpath: org.postgresql.Driver
+```
+
+**Solution:**
+
+The tool automatically loads JDBC drivers from the dSeries `lib` directory. If you see this error:
+
+1. **Use the launcher scripts (recommended):**
+   ```bash
+   # These scripts automatically include all JARs from lib directory
+   dseries_healthcheck.bat <install_dir>    # Windows
+   ./dseries_healthcheck.sh <install_dir>   # Unix/Linux/AIX
+   ```
+
+2. **Check if JDBC driver exists:**
+   ```bash
+   # PostgreSQL
+   ls <install_dir>/lib/postgresql*.jar
+   ls <install_dir>/webserver/lib/postgresql*.jar
+   
+   # Oracle
+   ls <install_dir>/lib/ojdbc*.jar
+   
+   # SQL Server
+   ls <install_dir>/lib/mssql*.jar
+   ```
+
+3. **Download JDBC driver if missing:**
+   
+   **PostgreSQL:**
+   - Download: https://jdbc.postgresql.org/download/
+   - Place in: `<install_dir>/lib/`
+   - File: `postgresql-42.5.0.jar` or later
+   
+   **Oracle:**
+   - Download: https://www.oracle.com/database/technologies/appdev/jdbc-downloads.html
+   - Place in: `<install_dir>/lib/`
+   - File: `ojdbc8.jar` or later
+   
+   **SQL Server:**
+   - Download: https://learn.microsoft.com/en-us/sql/connect/jdbc/download-microsoft-jdbc-driver-for-sql-server
+   - Place in: `<install_dir>/lib/`
+   - File: `mssql-jdbc-12.2.0.jre8.jar` or later
+
+4. **For detailed JDBC configuration, see:**
+   - `docs/JDBC_DRIVER_GUIDE.md` (included in package)
+
+---
+
+### Issue 6: Database Connection Failed
 
 **Error:**
 ```

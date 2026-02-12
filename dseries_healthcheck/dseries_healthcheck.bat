@@ -112,28 +112,39 @@ set "CLASSPATH=%SCRIPT_DIR%dseries-healthcheck.jar"
 REM Add dSeries lib directory JARs (for JDBC drivers and encryption)
 if exist "%DSERIES_HOME%\lib" (
     echo   Adding dSeries libraries from: %DSERIES_HOME%\lib
-    for %%f in ("%DSERIES_HOME%\lib\*.jar") do (
-        set "CLASSPATH=!CLASSPATH!;%%f"
+    
+    REM Use wildcard for all JARs (Java 6+ supports this)
+    set "CLASSPATH=!CLASSPATH!;%DSERIES_HOME%\lib\*"
+    
+    REM Also add subdirectories if they exist
+    if exist "%DSERIES_HOME%\lib\jdbc" (
+        set "CLASSPATH=!CLASSPATH!;%DSERIES_HOME%\lib\jdbc\*"
+    )
+    if exist "%DSERIES_HOME%\lib\ext" (
+        set "CLASSPATH=!CLASSPATH!;%DSERIES_HOME%\lib\ext\*"
     )
 )
 
 REM Add dSeries third-party libs if exists
 if exist "%DSERIES_HOME%\third-party" (
     echo   Adding third-party libraries from: %DSERIES_HOME%\third-party
-    for %%f in ("%DSERIES_HOME%\third-party\*.jar") do (
-        set "CLASSPATH=!CLASSPATH!;%%f"
-    )
+    set "CLASSPATH=!CLASSPATH!;%DSERIES_HOME%\third-party\*"
 )
 
 REM Add dSeries ext directory if exists
 if exist "%DSERIES_HOME%\ext" (
     echo   Adding extension libraries from: %DSERIES_HOME%\ext
-    for %%f in ("%DSERIES_HOME%\ext\*.jar") do (
-        set "CLASSPATH=!CLASSPATH!;%%f"
-    )
+    set "CLASSPATH=!CLASSPATH!;%DSERIES_HOME%\ext\*"
 )
 
-echo   OK: Classpath built
+REM Add any additional common locations
+if exist "%DSERIES_HOME%\webserver\lib" (
+    echo   Adding webserver libraries from: %DSERIES_HOME%\webserver\lib
+    set "CLASSPATH=!CLASSPATH!;%DSERIES_HOME%\webserver\lib\*"
+)
+
+echo   OK: Classpath built with wildcard support
+echo   Classpath includes all JARs from lib directories
 echo.
 
 REM ============================================================================

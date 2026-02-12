@@ -126,47 +126,50 @@ find_java() {
 build_classpath() {
     CLASSPATH="${SCRIPT_DIR}/dseries-healthcheck.jar"
     
-    # Add dSeries lib directory
+    # Add dSeries lib directory (use wildcard for all JARs)
     if [ -d "${DSERIES_HOME}/lib" ]; then
         echo "  Adding dSeries libraries from: ${DSERIES_HOME}/lib"
-        for jar in "${DSERIES_HOME}/lib"/*.jar; do
-            if [ -f "$jar" ]; then
-                CLASSPATH="${CLASSPATH}:${jar}"
-            fi
-        done
+        
+        # Use wildcard for all JARs (Java 6+ supports this)
+        CLASSPATH="${CLASSPATH}:${DSERIES_HOME}/lib/*"
+        
+        # Also add subdirectories if they exist
+        if [ -d "${DSERIES_HOME}/lib/jdbc" ]; then
+            CLASSPATH="${CLASSPATH}:${DSERIES_HOME}/lib/jdbc/*"
+        fi
+        if [ -d "${DSERIES_HOME}/lib/ext" ]; then
+            CLASSPATH="${CLASSPATH}:${DSERIES_HOME}/lib/ext/*"
+        fi
     fi
     
     # Add dSeries third-party libs
     if [ -d "${DSERIES_HOME}/third-party" ]; then
         echo "  Adding third-party libraries from: ${DSERIES_HOME}/third-party"
-        for jar in "${DSERIES_HOME}/third-party"/*.jar; do
-            if [ -f "$jar" ]; then
-                CLASSPATH="${CLASSPATH}:${jar}"
-            fi
-        done
+        CLASSPATH="${CLASSPATH}:${DSERIES_HOME}/third-party/*"
     fi
     
     # Add dSeries ext directory
     if [ -d "${DSERIES_HOME}/ext" ]; then
         echo "  Adding extension libraries from: ${DSERIES_HOME}/ext"
-        for jar in "${DSERIES_HOME}/ext"/*.jar; do
-            if [ -f "$jar" ]; then
-                CLASSPATH="${CLASSPATH}:${jar}"
-            fi
-        done
+        CLASSPATH="${CLASSPATH}:${DSERIES_HOME}/ext/*"
+    fi
+    
+    # Add webserver libs (often contains JDBC drivers)
+    if [ -d "${DSERIES_HOME}/webserver/lib" ]; then
+        echo "  Adding webserver libraries from: ${DSERIES_HOME}/webserver/lib"
+        CLASSPATH="${CLASSPATH}:${DSERIES_HOME}/webserver/lib/*"
     fi
     
     # AIX specific - add additional library paths
     if [ "${OS_NAME}" = "AIX" ]; then
         if [ -d "${DSERIES_HOME}/aix_lib" ]; then
             echo "  Adding AIX-specific libraries from: ${DSERIES_HOME}/aix_lib"
-            for jar in "${DSERIES_HOME}/aix_lib"/*.jar; do
-                if [ -f "$jar" ]; then
-                    CLASSPATH="${CLASSPATH}:${jar}"
-                fi
-            done
+            CLASSPATH="${CLASSPATH}:${DSERIES_HOME}/aix_lib/*"
         fi
     fi
+    
+    echo "  OK: Classpath built with wildcard support"
+    echo "  Classpath includes all JARs from lib directories"
 }
 
 # ============================================================================
