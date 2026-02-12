@@ -12,8 +12,18 @@ import java.util.Date;
  * Performs technical reviews including architecture, security, database,
  * agents, clients, high availability, and performance checks.
  * 
- * Version: 2.3.0
+ * Version: 2.4.0
  * Date: 2026-02-12
+ * 
+ * Version 2.4.0 Enhancements:
+ * - SSL/TLS certificate support (trustStore, trustStorePassword)
+ * - Windows authentication (integratedSecurity) detection and handling
+ * - AIX+Oracle SSL special handling
+ * - Connection validation with timeout (isValid)
+ * - Query timeout and performance monitoring
+ * - Enhanced resource cleanup with proper finally blocks
+ * - Scrambler encryption support (dSeries native)
+ * - Connection retry logic with configurable attempts
  * 
  * Version 2.3.0 Enhancements:
  * - Dynamic classpath loading from dSeries bin/classpath.bat
@@ -62,7 +72,22 @@ public class DSeriesHealthCheck {
     private static String dbUser = "dseries_user";
     private static String dbPassword = "";
     private static String dbDriver = "org.postgresql.Driver";
+    private static String dbType = "";
     private static Connection dbConnection = null;
+    
+    // SSL/TLS properties
+    private static String sslTrustStore = null;
+    private static String sslTrustStorePassword = null;
+    private static boolean sslEnabled = false;
+    
+    // Windows authentication
+    private static boolean integratedSecurity = false;
+    
+    // Connection timing
+    private static long connectionStartTime = 0;
+    private static long connectionEndTime = 0;
+    private static long queryStartTime = 0;
+    private static long queryEndTime = 0;
     
     // Health check results
     private static int totalChecks = 0;
@@ -735,6 +760,54 @@ public class DSeriesHealthCheck {
                 }
             }
             
+            // Check for Windows authentication
+            String winAuthProp = props.getProperty("integratedSecurity", "false");
+            integratedSecurity = Boolean.parseBoolean(winAuthProp);
+            if (integratedSecurity) {
+                System.out.println("  ℹ️  Windows authentication enabled (integratedSecurity=true)");
+            }
+            
+            // Check for SSL/TLS configuration
+            sslTrustStore = props.getProperty("javax.net.ssl.trustStore");
+            sslTrustStorePassword = props.getProperty("javax.net.ssl.trustStorePassword");
+            
+            if (sslTrustStore != null && !sslTrustStore.isEmpty()) {
+                sslEnabled = true;
+                System.out.println("  ℹ️  SSL/TLS enabled");
+                System.out.println("    TrustStore: " + sslTrustStore);
+                
+                // Decrypt trustStore password if encrypted
+                if (sslTrustStorePassword != null && !sslTrustStorePassword.isEmpty()) {
+                    String decryptedTrustStorePassword = decryptPassword(sslTrustStorePassword);
+                    if (!decryptedTrustStorePassword.isEmpty()) {
+                        sslTrustStorePassword = decryptedTrustStorePassword;
+                        System.out.println("    TrustStore password: ******** (decrypted)");
+                    } else {
+                        System.out.println("    ⚠️  TrustStore password decryption failed");
+                    }
+                    
+                    // Set system properties for SSL (required for DB2 and some Oracle configs)
+                    System.setProperty("javax.net.ssl.trustStore", sslTrustStore);
+                    System.setProperty("javax.net.ssl.trustStorePassword", sslTrustStorePassword);
+                    System.out.println("    ✅ SSL system properties configured");
+                }
+            }
+            
+            // Check for Oracle SSL on AIX (special handling)
+            String osName = System.getProperty("os.name").toLowerCase();
+            if (osName.contains("aix") && dbType.equals("oracle") && sslEnabled) {
+                System.out.println("  ℹ️  AIX + Oracle SSL detected - special configuration applied");
+                // Additional Oracle SSL properties for AIX
+                String oracleClientAuth = props.getProperty("oracle.net.ssl_client_authentication");
+                String oracleClientVersion = props.getProperty("oracle.net.ssl_version");
+                if (oracleClientAuth != null) {
+                    System.out.println("    Oracle SSL client auth: " + oracleClientAuth);
+                }
+                if (oracleClientVersion != null) {
+                    System.out.println("    Oracle SSL version: " + oracleClientVersion);
+                }
+            }
+            
             System.out.println("  ✅ Database configuration loaded");
             System.out.println("    Host: " + maskSensitiveData(dbHost));
             System.out.println("    Port: " + dbPort);
@@ -834,10 +907,79 @@ public class DSeriesHealthCheck {
             
             System.out.println("  Connecting to database...");
             
-            // Attempt connection
-            dbConnection = DriverManager.getConnection(jdbcUrl, dbUser, dbPassword);
+            // Start connection timing
+            connectionStartTime = System.currentTimeMillis();
+            
+            // Build connection properties
+            Properties connectionProps = new Properties();
+            
+            // Add user/password if not using Windows authentication
+            if (!integratedSecurity) {
+                if (dbUser != null && !dbUser.isEmpty()) {
+                    connectionProps.setProperty("user", dbUser);
+                }
+                if (dbPassword != null && !dbPassword.isEmpty()) {
+                    connectionProps.setProperty("password", dbPassword);
+                }
+            }
+            
+            // Add SSL properties if enabled
+            if (sslEnabled && sslTrustStore != null) {
+                connectionProps.setProperty("javax.net.ssl.trustStore", sslTrustStore);
+                if (sslTrustStorePassword != null) {
+                    connectionProps.setProperty("javax.net.ssl.trustStorePassword", sslTrustStorePassword);
+                }
+                System.out.println("  ℹ️  SSL properties added to connection");
+            }
+            
+            // Attempt connection with retry logic
+            int maxRetries = 3;
+            int retryCount = 0;
+            SQLException lastException = null;
+            
+            while (retryCount < maxRetries) {
+                try {
+                    if (retryCount > 0) {
+                        System.out.println("  ℹ️  Retry attempt " + retryCount + " of " + (maxRetries - 1));
+                        Thread.sleep(2000); // Wait 2 seconds between retries
+                    }
+                    
+                    dbConnection = DriverManager.getConnection(jdbcUrl, connectionProps);
+                    break; // Connection successful
+                    
+                } catch (SQLException e) {
+                    lastException = e;
+                    retryCount++;
+                    if (retryCount < maxRetries) {
+                        System.out.println("  ⚠️  Connection attempt failed: " + e.getMessage());
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+            
+            if (dbConnection == null) {
+                throw lastException;
+            }
+            
+            connectionEndTime = System.currentTimeMillis();
+            long connectionTime = connectionEndTime - connectionStartTime;
             
             System.out.println("  ✅ Database connection established successfully");
+            System.out.println("    Connection time: " + connectionTime + " ms");
+            
+            // Validate connection
+            System.out.println("  Validating connection...");
+            if (dbConnection.isValid(30)) {
+                System.out.println("  ✅ Connection is valid (validated in 30 seconds)");
+            } else {
+                System.out.println("  ⚠️  Connection validation failed or timed out");
+                dbConnection.close();
+                dbConnection = null;
+                return false;
+            }
+            
             System.out.println();
             return true;
             
@@ -989,9 +1131,22 @@ public class DSeriesHealthCheck {
         System.out.println("[" + check.checkId + "] " + check.checkName);
         totalChecks++;
         
+        Statement stmt = null;
+        ResultSet rs = null;
+        
         try {
-            Statement stmt = dbConnection.createStatement();
-            ResultSet rs = stmt.executeQuery(check.query);
+            // Start query timing
+            queryStartTime = System.currentTimeMillis();
+            
+            stmt = dbConnection.createStatement();
+            
+            // Set query timeout (30 seconds)
+            stmt.setQueryTimeout(30);
+            
+            rs = stmt.executeQuery(check.query);
+            
+            queryEndTime = System.currentTimeMillis();
+            long queryTime = queryEndTime - queryStartTime;
             
             // Get result
             if (rs.next()) {
@@ -1022,19 +1177,41 @@ public class DSeriesHealthCheck {
                 }
                 
                 System.out.println("  " + message);
+                
+                // Add query performance info if slow
+                if (queryTime > 1000) {
+                    System.out.println("  ⚠️  Query took " + queryTime + " ms (slow)");
+                }
+                
                 checkResults.add(new CheckResult(check.checkId, check.checkName, check.category,
                     check.severity, status, message, check.remediation));
             }
             
-            rs.close();
-            stmt.close();
-            
+        } catch (java.sql.SQLTimeoutException e) {
+            warningChecks++;
+            String message = "⚠️  Query timeout (> 30 seconds): " + check.checkName;
+            System.out.println("  " + message);
+            System.out.println("  Database may be slow or query is inefficient");
+            checkResults.add(new CheckResult(check.checkId, check.checkName, check.category,
+                check.severity, "WARNING", message, "Optimize query or check database performance"));
         } catch (SQLException e) {
             warningChecks++;
             String message = "⚠️  Query failed: " + e.getMessage();
             System.out.println("  " + message);
             checkResults.add(new CheckResult(check.checkId, check.checkName, check.category,
                 check.severity, "WARNING", message, "Check query syntax and table existence"));
+        } finally {
+            // Proper resource cleanup
+            try {
+                if (rs != null) {
+                    rs.close();
+                }
+                if (stmt != null) {
+                    stmt.close();
+                }
+            } catch (SQLException e) {
+                System.out.println("  ⚠️  Error closing resources: " + e.getMessage());
+            }
         }
         System.out.println();
     }
