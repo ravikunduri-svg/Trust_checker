@@ -124,16 +124,43 @@ find_java() {
 
 # Build classpath
 build_classpath() {
+    # Try to use dSeries native classpath.sh for complete classpath
+    if [ -f "${DSERIES_HOME}/bin/classpath.sh" ] || [ -f "${DSERIES_HOME}/bin/classpath" ]; then
+        echo "  Using dSeries native classpath script..."
+        
+        # Execute classpath script to set CLASSPATH
+        if [ -f "${DSERIES_HOME}/bin/classpath.sh" ]; then
+            . "${DSERIES_HOME}/bin/classpath.sh" >/dev/null 2>&1
+        elif [ -f "${DSERIES_HOME}/bin/classpath" ]; then
+            . "${DSERIES_HOME}/bin/classpath" >/dev/null 2>&1
+        fi
+        
+        if [ -n "${CLASSPATH}" ]; then
+            echo "  OK: dSeries classpath loaded successfully"
+            echo "  ℹ️  Includes all JDBC drivers, encryption libs, and auth libraries"
+            
+            # Add our health check JAR to the beginning
+            CLASSPATH="${SCRIPT_DIR}/dseries-healthcheck.jar:${CLASSPATH}"
+            return 0
+        else
+            echo "  WARNING: classpath script did not set CLASSPATH"
+            echo "  Falling back to manual classpath building..."
+        fi
+    else
+        echo "  WARNING: classpath script not found"
+        echo "  Falling back to manual classpath building..."
+    fi
+    
+    # Manual classpath building (fallback)
+    echo "  Building classpath manually..."
+    
     CLASSPATH="${SCRIPT_DIR}/dseries-healthcheck.jar"
     
     # Add dSeries lib directory (use wildcard for all JARs)
     if [ -d "${DSERIES_HOME}/lib" ]; then
         echo "  Adding dSeries libraries from: ${DSERIES_HOME}/lib"
-        
-        # Use wildcard for all JARs (Java 6+ supports this)
         CLASSPATH="${CLASSPATH}:${DSERIES_HOME}/lib/*"
         
-        # Also add subdirectories if they exist
         if [ -d "${DSERIES_HOME}/lib/jdbc" ]; then
             CLASSPATH="${CLASSPATH}:${DSERIES_HOME}/lib/jdbc/*"
         fi
@@ -168,8 +195,7 @@ build_classpath() {
         fi
     fi
     
-    echo "  OK: Classpath built with wildcard support"
-    echo "  Classpath includes all JARs from lib directories"
+    echo "  OK: Manual classpath built"
 }
 
 # ============================================================================
@@ -276,8 +302,27 @@ echo ""
 echo "========================================================================"
 echo ""
 
-# Set Java options
-JAVA_OPTS="-Xmx512m -Dfile.encoding=UTF-8"
+# Setup native library path (for database authentication libraries)
+if [ -d "${DSERIES_HOME}/bin" ]; then
+    # Add dSeries bin to LD_LIBRARY_PATH (Linux) or LIBPATH (AIX) or SHLIB_PATH (HP-UX)
+    case "${OS_NAME}" in
+        AIX)
+            LIBPATH="${DSERIES_HOME}/bin:${LIBPATH}"
+            export LIBPATH
+            ;;
+        HP-UX)
+            SHLIB_PATH="${DSERIES_HOME}/bin:${SHLIB_PATH}"
+            export SHLIB_PATH
+            ;;
+        *)
+            LD_LIBRARY_PATH="${DSERIES_HOME}/bin:${LD_LIBRARY_PATH}"
+            export LD_LIBRARY_PATH
+            ;;
+    esac
+fi
+
+# Set Java options (including java.library.path for native libraries)
+JAVA_OPTS="-Xmx512m -Dfile.encoding=UTF-8 -Djava.library.path=${DSERIES_HOME}/bin"
 
 # OS-specific Java options
 case "${OS_NAME}" in

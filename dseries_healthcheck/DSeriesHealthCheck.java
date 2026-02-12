@@ -12,8 +12,15 @@ import java.util.Date;
  * Performs technical reviews including architecture, security, database,
  * agents, clients, high availability, and performance checks.
  * 
- * Version: 2.2.0
+ * Version: 2.3.0
  * Date: 2026-02-12
+ * 
+ * Version 2.3.0 Enhancements:
+ * - Dynamic classpath loading from dSeries bin/classpath.bat
+ * - Native dSeries password encryption/decryption support
+ * - Universal database support (PostgreSQL, Oracle, DB2, SQL Server, etc.)
+ * - Windows authentication DLL support for SQL Server
+ * - Automatic detection and loading of all JDBC drivers
  * 
  * Version 2.2.0 Enhancements:
  * - Automatic JDBC driver detection and loading
@@ -654,6 +661,22 @@ public class DSeriesHealthCheck {
             
             dbDriver = props.getProperty("rdbms.driver", dbDriver);
             
+            // Detect database type from driver or URL
+            String dbType = props.getProperty("rdbms.type", "").toLowerCase();
+            if (dbType.isEmpty()) {
+                if (jdbcUrl.contains("postgresql") || dbDriver.contains("postgresql")) {
+                    dbType = "postgresql";
+                } else if (jdbcUrl.contains("oracle") || dbDriver.contains("oracle")) {
+                    dbType = "oracle";
+                } else if (jdbcUrl.contains("sqlserver") || dbDriver.contains("sqlserver")) {
+                    dbType = "sqlserver";
+                } else if (jdbcUrl.contains("db2") || dbDriver.contains("db2")) {
+                    dbType = "db2";
+                }
+            }
+            
+            System.out.println("  ℹ️  Detected database type: " + dbType.toUpperCase());
+            
             // Parse JDBC URL to extract host, port, and database name
             if (jdbcUrl.contains("postgresql")) {
                 // PostgreSQL: jdbc:postgresql://host:port/database
@@ -679,6 +702,7 @@ public class DSeriesHealthCheck {
                 }
             } else if (jdbcUrl.contains("sqlserver")) {
                 // SQL Server: jdbc:sqlserver://host:port;databaseName=database
+                // Also supports Windows authentication via integratedSecurity=true
                 Pattern pattern = Pattern.compile("jdbc:sqlserver://([^:;]+):?(\\d+)?;.*databaseName=([^;]+)");
                 Matcher matcher = pattern.matcher(jdbcUrl);
                 if (matcher.find()) {
@@ -687,6 +711,25 @@ public class DSeriesHealthCheck {
                         dbPort = Integer.parseInt(matcher.group(2));
                     } else {
                         dbPort = 1433;  // Default SQL Server port
+                    }
+                    dbName = matcher.group(3);
+                }
+                
+                // Check for Windows authentication
+                if (jdbcUrl.toLowerCase().contains("integratedsecurity=true")) {
+                    System.out.println("  ℹ️  Windows authentication detected (integratedSecurity=true)");
+                    System.out.println("  ℹ️  Ensure sqljdbc_auth.dll is in system PATH or java.library.path");
+                }
+            } else if (jdbcUrl.contains("db2")) {
+                // DB2: jdbc:db2://host:port/database
+                Pattern pattern = Pattern.compile("jdbc:db2://([^:/?]+):?(\\d+)?/([^:;?]+)");
+                Matcher matcher = pattern.matcher(jdbcUrl);
+                if (matcher.find()) {
+                    dbHost = matcher.group(1);
+                    if (matcher.group(2) != null) {
+                        dbPort = Integer.parseInt(matcher.group(2));
+                    } else {
+                        dbPort = 50000;  // Default DB2 port
                     }
                     dbName = matcher.group(3);
                 }
@@ -767,9 +810,26 @@ public class DSeriesHealthCheck {
                 jdbcUrl = "jdbc:oracle:thin:@" + dbHost + ":" + dbPort + ":" + dbName;
             } else if (dbDriver.contains("sqlserver")) {
                 jdbcUrl = "jdbc:sqlserver://" + dbHost + ":" + dbPort + ";databaseName=" + dbName;
+                // Windows authentication support
+                if (dbUser.isEmpty() || dbPassword.isEmpty()) {
+                    jdbcUrl += ";integratedSecurity=true";
+                    System.out.println("  ℹ️  Using Windows authentication (integratedSecurity=true)");
+                }
+            } else if (dbDriver.contains("db2")) {
+                jdbcUrl = "jdbc:db2://" + dbHost + ":" + dbPort + "/" + dbName;
             } else {
-                // Generic JDBC URL (already in jdbc.URL property)
-                jdbcUrl = "jdbc:postgresql://" + dbHost + ":" + dbPort + "/" + dbName;
+                // Try to use the original JDBC URL from db.properties
+                try {
+                    File configFile = useExternalDbConfig && externalDbConfigFile != null 
+                        ? new File(externalDbConfigFile) 
+                        : new File(installDir, "conf/db.properties");
+                    
+                    Properties props = new Properties();
+                    props.load(new FileInputStream(configFile));
+                    jdbcUrl = props.getProperty("jdbc.URL", "jdbc:postgresql://" + dbHost + ":" + dbPort + "/" + dbName);
+                } catch (Exception e) {
+                    jdbcUrl = "jdbc:postgresql://" + dbHost + ":" + dbPort + "/" + dbName;
+                }
             }
             
             System.out.println("  Connecting to database...");
@@ -1161,47 +1221,84 @@ public class DSeriesHealthCheck {
     }
     
     /**
-     * Decrypt password using dSeries encryption
+     * Decrypt password using dSeries native encryption
      * Supports multiple encryption formats:
-     * 1. Plain text (legacy)
-     * 2. Base64 encoded with prefix (e.g., "ENC(base64string)")
-     * 3. dSeries encrypted format
+     * 1. Base64 (no prefix) - dSeries default encrypted format
+     * 2. ENC(base64) - Simple Base64 encoding
+     * 3. {ENCRYPTED}hex - Alternative dSeries format
+     * 4. Plain text - No encryption
+     * 
+     * This method uses dSeries native encryption library (com.ca.wa.de.security.Encryption)
+     * when available in classpath for proper decryption of all dSeries password formats.
      * 
      * @param encryptedPassword The encrypted password from db.properties
-     * @return Decrypted password or original if not encrypted
+     * @return Decrypted password or empty string if decryption fails
      */
     private static String decryptPassword(String encryptedPassword) {
         if (encryptedPassword == null || encryptedPassword.isEmpty()) {
             return "";
         }
         
-        // Check if password is encrypted
-        if (encryptedPassword.startsWith("ENC(") && encryptedPassword.endsWith(")")) {
+        // Try dSeries native decryption first (handles all dSeries formats)
+        if (isDSeriesEncryptionAvailable()) {
             try {
-                // Extract encrypted value
-                String encrypted = encryptedPassword.substring(4, encryptedPassword.length() - 1);
+                System.out.println("  ℹ️  Using dSeries native encryption library for password decryption");
                 
-                // Try Base64 decoding (common dSeries approach)
-                try {
-                    byte[] decodedBytes = java.util.Base64.getDecoder().decode(encrypted);
-                    return new String(decodedBytes, "UTF-8");
-                } catch (Exception e) {
-                    // If Base64 fails, try other decryption methods
-                    System.out.println("  ⚠️  Password appears encrypted but could not decrypt");
-                    System.out.println("  Note: Advanced encryption requires dSeries encryption library");
-                    return "";
+                // Use reflection to call dSeries encryption
+                Class<?> encryptionClass = Class.forName("com.ca.wa.de.security.Encryption");
+                java.lang.reflect.Method decryptMethod = encryptionClass.getMethod("decrypt", String.class);
+                Object result = decryptMethod.invoke(null, encryptedPassword);
+                
+                if (result != null && !result.toString().isEmpty()) {
+                    System.out.println("  ✅ Password decrypted successfully using dSeries encryption");
+                    return result.toString();
                 }
             } catch (Exception e) {
-                System.out.println("  ⚠️  Error decrypting password: " + e.getMessage());
+                System.out.println("  ⚠️  dSeries decryption failed: " + e.getMessage());
+                // Fall through to try other methods
+            }
+        }
+        
+        // Format 1: ENC(base64) - Simple Base64 encoding
+        if (encryptedPassword.startsWith("ENC(") && encryptedPassword.endsWith(")")) {
+            try {
+                String encrypted = encryptedPassword.substring(4, encryptedPassword.length() - 1);
+                byte[] decodedBytes = java.util.Base64.getDecoder().decode(encrypted);
+                System.out.println("  ✅ Password decrypted using Base64");
+                return new String(decodedBytes, "UTF-8");
+            } catch (Exception e) {
+                System.out.println("  ⚠️  Base64 decryption failed: " + e.getMessage());
                 return "";
             }
-        } else if (encryptedPassword.startsWith("{") && encryptedPassword.endsWith("}")) {
-            // Alternate encryption format
-            System.out.println("  ℹ️  Password uses alternate encryption format");
-            System.out.println("  Note: Advanced encryption requires dSeries encryption library");
+        }
+        
+        // Format 2: {ENCRYPTED}hex - Alternative format
+        else if (encryptedPassword.startsWith("{") && encryptedPassword.endsWith("}")) {
+            System.out.println("  ⚠️  Encrypted password format detected but decryption library not available");
+            System.out.println("  Note: Ensure dSeries encryption library (wade.jar) is in classpath");
             return "";
-        } else {
-            // Plain text password (not recommended for production)
+        }
+        
+        // Format 3: Try Base64 decoding without prefix (dSeries default)
+        else {
+            // Check if it looks like Base64 (contains only valid Base64 characters)
+            if (encryptedPassword.matches("^[A-Za-z0-9+/=]+$") && encryptedPassword.length() > 10) {
+                try {
+                    byte[] decodedBytes = java.util.Base64.getDecoder().decode(encryptedPassword);
+                    String decoded = new String(decodedBytes, "UTF-8");
+                    
+                    // Verify it's printable text (not binary garbage)
+                    if (decoded.matches("^[\\x20-\\x7E]+$")) {
+                        System.out.println("  ✅ Password decrypted using Base64 (no prefix)");
+                        return decoded;
+                    }
+                } catch (Exception e) {
+                    // Not Base64, assume plain text
+                }
+            }
+            
+            // Assume plain text
+            System.out.println("  ℹ️  Using plain text password (no encryption detected)");
             return encryptedPassword;
         }
     }
@@ -1218,6 +1315,136 @@ public class DSeriesHealthCheck {
         } catch (ClassNotFoundException e) {
             return false;
         }
+    }
+    
+    /**
+     * Get classpath from dSeries bin/classpath.bat or bin/classpath.sh
+     * This ensures we use the exact same classpath as dSeries, including:
+     * - All JDBC drivers (PostgreSQL, Oracle, DB2, SQL Server)
+     * - Encryption libraries
+     * - Authentication DLLs (for Windows authentication)
+     * 
+     * @return classpath string or null if failed
+     */
+    private static String getDSeriesClasspath() {
+        try {
+            String os = System.getProperty("os.name").toLowerCase();
+            File binDir = new File(installDir, "bin");
+            
+            if (!binDir.exists()) {
+                System.out.println("  ⚠️  bin directory not found: " + binDir.getPath());
+                return null;
+            }
+            
+            ProcessBuilder pb;
+            File classpathScript;
+            
+            if (os.contains("win")) {
+                // Windows: Execute classpath.bat
+                classpathScript = new File(binDir, "classpath.bat");
+                if (!classpathScript.exists()) {
+                    System.out.println("  ⚠️  classpath.bat not found: " + classpathScript.getPath());
+                    return null;
+                }
+                
+                // Create a wrapper script to echo the CLASSPATH
+                File tempScript = File.createTempFile("get_classpath_", ".bat");
+                tempScript.deleteOnExit();
+                
+                PrintWriter writer = new PrintWriter(tempScript);
+                writer.println("@echo off");
+                writer.println("call \"" + classpathScript.getAbsolutePath() + "\"");
+                writer.println("echo %CLASSPATH%");
+                writer.close();
+                
+                pb = new ProcessBuilder("cmd.exe", "/c", tempScript.getAbsolutePath());
+                
+            } else {
+                // Unix/Linux/AIX: Execute classpath.sh
+                classpathScript = new File(binDir, "classpath.sh");
+                if (!classpathScript.exists()) {
+                    classpathScript = new File(binDir, "classpath");
+                }
+                
+                if (!classpathScript.exists()) {
+                    System.out.println("  ⚠️  classpath.sh not found: " + classpathScript.getPath());
+                    return null;
+                }
+                
+                // Create a wrapper script to echo the CLASSPATH
+                File tempScript = File.createTempFile("get_classpath_", ".sh");
+                tempScript.deleteOnExit();
+                tempScript.setExecutable(true);
+                
+                PrintWriter writer = new PrintWriter(tempScript);
+                writer.println("#!/bin/sh");
+                writer.println(". \"" + classpathScript.getAbsolutePath() + "\"");
+                writer.println("echo $CLASSPATH");
+                writer.close();
+                
+                pb = new ProcessBuilder("/bin/sh", tempScript.getAbsolutePath());
+            }
+            
+            pb.directory(binDir);
+            pb.redirectErrorStream(true);
+            
+            Process process = pb.start();
+            BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            
+            StringBuilder output = new StringBuilder();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                output.append(line).append("\n");
+            }
+            
+            int exitCode = process.waitFor();
+            
+            if (exitCode != 0) {
+                System.out.println("  ⚠️  Failed to execute classpath script (exit code: " + exitCode + ")");
+                return null;
+            }
+            
+            // Get the last non-empty line (should be the CLASSPATH)
+            String[] lines = output.toString().split("\n");
+            for (int i = lines.length - 1; i >= 0; i--) {
+                String classpath = lines[i].trim();
+                if (!classpath.isEmpty() && classpath.contains("jar")) {
+                    // Clean up the classpath (remove quotes)
+                    classpath = classpath.replace("\"", "");
+                    System.out.println("  ✅ dSeries classpath loaded successfully");
+                    System.out.println("  ℹ️  Classpath includes " + countJars(classpath) + " JAR files");
+                    return classpath;
+                }
+            }
+            
+            System.out.println("  ⚠️  Could not extract classpath from script output");
+            return null;
+            
+        } catch (Exception e) {
+            System.out.println("  ⚠️  Error getting dSeries classpath: " + e.getMessage());
+            return null;
+        }
+    }
+    
+    /**
+     * Count number of JAR files in classpath
+     */
+    private static int countJars(String classpath) {
+        if (classpath == null || classpath.isEmpty()) {
+            return 0;
+        }
+        
+        String separator = System.getProperty("path.separator");
+        String[] paths = classpath.split(separator);
+        int count = 0;
+        
+        for (String path : paths) {
+            if (path.toLowerCase().endsWith(".jar")) {
+                count++;
+            }
+        }
+        
+        return count;
     }
     
     /**

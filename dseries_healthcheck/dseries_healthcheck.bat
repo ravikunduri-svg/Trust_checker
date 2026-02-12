@@ -107,16 +107,44 @@ REM ============================================================================
 
 echo [3/6] Building classpath...
 
+REM Try to use dSeries native classpath.bat for complete classpath
+if exist "%DSERIES_HOME%\bin\classpath.bat" (
+    echo   Using dSeries native classpath.bat...
+    
+    REM Execute classpath.bat to set CLASSPATH
+    pushd "%DSERIES_HOME%\bin"
+    call classpath.bat >nul 2>&1
+    popd
+    
+    if defined CLASSPATH (
+        echo   OK: dSeries classpath loaded successfully
+        echo   ℹ️  Includes all JDBC drivers, encryption libs, and auth DLLs
+        
+        REM Add our health check JAR to the beginning
+        set "CLASSPATH=%SCRIPT_DIR%dseries-healthcheck.jar;!CLASSPATH!"
+    ) else (
+        echo   WARNING: classpath.bat did not set CLASSPATH
+        echo   Falling back to manual classpath building...
+        goto :MANUAL_CLASSPATH
+    )
+) else (
+    echo   WARNING: classpath.bat not found
+    echo   Falling back to manual classpath building...
+    goto :MANUAL_CLASSPATH
+)
+
+goto :CLASSPATH_DONE
+
+:MANUAL_CLASSPATH
+echo   Building classpath manually...
+
 set "CLASSPATH=%SCRIPT_DIR%dseries-healthcheck.jar"
 
 REM Add dSeries lib directory JARs (for JDBC drivers and encryption)
 if exist "%DSERIES_HOME%\lib" (
     echo   Adding dSeries libraries from: %DSERIES_HOME%\lib
-    
-    REM Use wildcard for all JARs (Java 6+ supports this)
     set "CLASSPATH=!CLASSPATH!;%DSERIES_HOME%\lib\*"
     
-    REM Also add subdirectories if they exist
     if exist "%DSERIES_HOME%\lib\jdbc" (
         set "CLASSPATH=!CLASSPATH!;%DSERIES_HOME%\lib\jdbc\*"
     )
@@ -125,26 +153,27 @@ if exist "%DSERIES_HOME%\lib" (
     )
 )
 
-REM Add dSeries third-party libs if exists
+REM Add dSeries third-party libs
 if exist "%DSERIES_HOME%\third-party" (
     echo   Adding third-party libraries from: %DSERIES_HOME%\third-party
     set "CLASSPATH=!CLASSPATH!;%DSERIES_HOME%\third-party\*"
 )
 
-REM Add dSeries ext directory if exists
+REM Add dSeries ext directory
 if exist "%DSERIES_HOME%\ext" (
     echo   Adding extension libraries from: %DSERIES_HOME%\ext
     set "CLASSPATH=!CLASSPATH!;%DSERIES_HOME%\ext\*"
 )
 
-REM Add any additional common locations
+REM Add webserver libs
 if exist "%DSERIES_HOME%\webserver\lib" (
     echo   Adding webserver libraries from: %DSERIES_HOME%\webserver\lib
     set "CLASSPATH=!CLASSPATH!;%DSERIES_HOME%\webserver\lib\*"
 )
 
-echo   OK: Classpath built with wildcard support
-echo   Classpath includes all JARs from lib directories
+echo   OK: Manual classpath built
+
+:CLASSPATH_DONE
 echo.
 
 REM ============================================================================
@@ -182,6 +211,15 @@ if exist "%SQL_CONFIG%" (
 echo.
 
 REM ============================================================================
+REM SETUP NATIVE LIBRARIES (for Windows Authentication)
+REM ============================================================================
+
+REM Add dSeries bin directory to PATH for native DLLs (e.g., sqljdbc_auth.dll)
+if exist "%DSERIES_HOME%\bin" (
+    set "PATH=%DSERIES_HOME%\bin;%PATH%"
+)
+
+REM ============================================================================
 REM RUN HEALTH CHECK
 REM ============================================================================
 
@@ -190,8 +228,8 @@ echo.
 echo ========================================================================
 echo.
 
-REM Set Java options
-set "JAVA_OPTS=-Xmx512m -Dfile.encoding=UTF-8"
+REM Set Java options (including java.library.path for native DLLs)
+set "JAVA_OPTS=-Xmx512m -Dfile.encoding=UTF-8 -Djava.library.path=%DSERIES_HOME%\bin"
 
 REM Run the health check
 if exist "%SQL_CONFIG%" (
