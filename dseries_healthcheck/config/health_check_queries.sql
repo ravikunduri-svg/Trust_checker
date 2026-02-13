@@ -151,98 +151,98 @@ WHERE NOT EXISTS (
 );
 
 -- ============================================================================
--- SECTION 3: AGENT CONNECTIVITY CHECKS
+-- SECTION 3: AGENT HEALTH CHECKS
 -- ============================================================================
 
--- @CHECK_ID: AG-001
--- @CHECK_NAME: Total Agents Connected
--- @CHECK_CATEGORY: Agents
+-- @CHECK_ID: AGENT-001
+-- @CHECK_NAME: Total Agent Count
+-- @CHECK_CATEGORY: Agent
 -- @SEVERITY: INFO
--- @DESCRIPTION: Count total number of connected agents
+-- @DESCRIPTION: Count total number of registered agents
 -- @THRESHOLD_OPERATOR: >
 -- @THRESHOLD_VALUE: 0
--- @REMEDIATION: Verify agent connectivity if no agents connected
-SELECT COUNT(*) as total_agents FROM esp_agent_rp WHERE STATUS = 'ACTIVE';
+-- @REMEDIATION: Ensure agents are properly registered
+SELECT COUNT(*) as total_agents FROM ESP_AGENT_RP;
 
--- @CHECK_ID: AG-002
--- @CHECK_NAME: Disconnected Agents
--- @CHECK_CATEGORY: Agents
+-- @CHECK_ID: AGENT-002
+-- @CHECK_NAME: Offline Agents
+-- @CHECK_CATEGORY: Agent
 -- @SEVERITY: WARNING
--- @DESCRIPTION: Count agents that are disconnected
+-- @DESCRIPTION: Count agents that are offline or not responding
 -- @THRESHOLD_OPERATOR: =
 -- @THRESHOLD_VALUE: 0
--- @REMEDIATION: Check agent logs and network connectivity
-SELECT COUNT(*) as disconnected_agents FROM esp_agent_rp WHERE STATUS != 'ACTIVE';
+-- @REMEDIATION: Investigate offline agents and restart if necessary
+SELECT COUNT(*) as offline_agents 
+FROM ESP_AGENT_RP 
+WHERE STATUS != 'ONLINE' OR STATUS IS NULL;
 
--- @CHECK_ID: AG-003
--- @CHECK_NAME: Agent Version Compatibility
--- @CHECK_CATEGORY: Agents
+-- @CHECK_ID: AGENT-003
+-- @CHECK_NAME: Agents with Failed Actions
+-- @CHECK_CATEGORY: Agent
 -- @SEVERITY: WARNING
--- @DESCRIPTION: Check for agents with outdated versions
+-- @DESCRIPTION: Count agents with failed recent actions
 -- @THRESHOLD_OPERATOR: =
 -- @THRESHOLD_VALUE: 0
--- @REMEDIATION: Upgrade agents to match server version
-SELECT COUNT(*) as outdated_agents 
-FROM esp_agent_rp 
-WHERE VERSION < (SELECT VERSION FROM ESP_SERVER_INFO);
+-- @REMEDIATION: Review agent action logs and resolve failures
+SELECT COUNT(*) as failed_actions 
+FROM ESP_AGENT_RP 
+WHERE ACTIONSTATUS = 2;
 
 -- ============================================================================
--- SECTION 4: CLIENT CONNECTIVITY CHECKS
+-- SECTION 4: EVENT AND TRIGGER CHECKS
 -- ============================================================================
 
--- @CHECK_ID: CL-001
--- @CHECK_NAME: Active Client Connections
--- @CHECK_CATEGORY: Clients
+-- @CHECK_ID: EVENT-001
+-- @CHECK_NAME: Pending Events
+-- @CHECK_CATEGORY: Event
 -- @SEVERITY: INFO
--- @DESCRIPTION: Count active client connections
--- @THRESHOLD_OPERATOR: >=
--- @THRESHOLD_VALUE: 0
--- @REMEDIATION: N/A - Informational only
-SELECT COUNT(*) as active_clients FROM ESP_CLIENT_SESSION WHERE STATUS = 'ACTIVE';
+-- @DESCRIPTION: Count pending events in the system
+-- @THRESHOLD_OPERATOR: <
+-- @THRESHOLD_VALUE: 1000
+-- @REMEDIATION: Review event processing and clear stale events
+SELECT COUNT(*) as pending_events 
+FROM ESP_EVENT 
+WHERE STATUS = 'PENDING';
 
--- @CHECK_ID: CL-002
--- @CHECK_NAME: Client Connection Failures
--- @CHECK_CATEGORY: Clients
+-- @CHECK_ID: EVENT-002
+-- @CHECK_NAME: Failed Events Last 24 Hours
+-- @CHECK_CATEGORY: Event
 -- @SEVERITY: WARNING
--- @DESCRIPTION: Count recent client connection failures
+-- @DESCRIPTION: Count events that failed in last 24 hours
 -- @THRESHOLD_OPERATOR: <
 -- @THRESHOLD_VALUE: 10
--- @REMEDIATION: Check network connectivity and client configurations
-SELECT COUNT(*) as failed_connections 
-FROM ESP_CONNECTION_LOG 
+-- @REMEDIATION: Investigate event failures and fix root causes
+SELECT COUNT(*) as failed_events 
+FROM ESP_EVENT 
 WHERE STATUS = 'FAILED' 
-AND TIMESTAMP > CURRENT_TIMESTAMP - INTERVAL '1 hour';
+AND EVENT_TIME > CURRENT_TIMESTAMP - INTERVAL '24 hours';
 
 -- ============================================================================
 -- SECTION 5: HIGH AVAILABILITY CHECKS
 -- ============================================================================
 
 -- @CHECK_ID: HA-001
--- @CHECK_NAME: HA Mode Status
--- @CHECK_CATEGORY: High Availability
--- @SEVERITY: CRITICAL
--- @DESCRIPTION: Check if HA mode is properly configured
--- @THRESHOLD_OPERATOR: =
--- @THRESHOLD_VALUE: ACTIVE
--- @REMEDIATION: Review HA configuration and ensure all nodes are operational
-
--- @CHECK_ID: HA-002
--- @CHECK_NAME: HA Node Status
--- @CHECK_CATEGORY: High Availability
--- @SEVERITY: CRITICAL
--- @DESCRIPTION: Check status of all HA nodes
--- @THRESHOLD_OPERATOR: ALL_ACTIVE
--- @THRESHOLD_VALUE: true
--- @REMEDIATION: Investigate and restart failed nodes
-
--- @CHECK_ID: HA-003
--- @CHECK_NAME: HA Failover History
+-- @CHECK_NAME: HA Configuration Status
 -- @CHECK_CATEGORY: High Availability
 -- @SEVERITY: INFO
--- @DESCRIPTION: Check recent failover events
--- @THRESHOLD_OPERATOR: <
--- @THRESHOLD_VALUE: 5
--- @REMEDIATION: Investigate frequent failovers
+-- @DESCRIPTION: Check if HA is configured
+-- @THRESHOLD_OPERATOR: >=
+-- @THRESHOLD_VALUE: 0
+-- @REMEDIATION: Review HA configuration if needed
+SELECT COUNT(*) as ha_config_count 
+FROM ESP_CONFIG_GROUP 
+WHERE TYPE = 'CONFIG_INSTANCE';
+
+-- @CHECK_ID: HA-002
+-- @CHECK_NAME: HA Stage2 Nodes
+-- @CHECK_CATEGORY: High Availability
+-- @SEVERITY: INFO
+-- @DESCRIPTION: Count HA Stage2 nodes
+-- @THRESHOLD_OPERATOR: >=
+-- @THRESHOLD_VALUE: 0
+-- @REMEDIATION: Ensure all HA nodes are properly configured
+SELECT COUNT(*) as ha_nodes 
+FROM ESP_STAGE2HAC;
 
 -- ============================================================================
 -- SECTION 6: PERFORMANCE METRICS
@@ -268,8 +268,8 @@ SELECT COUNT(DISTINCT appl_gen_no) as active_generations FROM ESP_APPLICATION;
 -- @REMEDIATION: Investigate and optimize long-running jobs
 SELECT COUNT(*) as long_running_jobs 
 FROM ESP_GENERIC_JOB 
-WHERE STATUS = 'RUNNING' 
-AND START_TIME < CURRENT_TIMESTAMP - INTERVAL '4 hours';
+WHERE STATUS = 'EXEC' 
+AND START_DATE_TIME < CURRENT_TIMESTAMP - INTERVAL '4 hours';
 
 -- @CHECK_ID: PERF-003
 -- @CHECK_NAME: Failed Jobs Last 24 Hours
@@ -282,7 +282,109 @@ AND START_TIME < CURRENT_TIMESTAMP - INTERVAL '4 hours';
 SELECT COUNT(*) as failed_jobs 
 FROM ESP_GENERIC_JOB 
 WHERE STATUS = 'FAILED' 
-AND END_TIME > CURRENT_TIMESTAMP - INTERVAL '24 hours';
+AND END_DATE_TIME > CURRENT_TIMESTAMP - INTERVAL '24 hours';
+
+-- @CHECK_ID: PERF-004
+-- @CHECK_NAME: Jobs in EXEC Status
+-- @CHECK_CATEGORY: Performance
+-- @SEVERITY: INFO
+-- @DESCRIPTION: Count currently executing jobs
+-- @THRESHOLD_OPERATOR: <
+-- @THRESHOLD_VALUE: 1000
+-- @REMEDIATION: Monitor for job bottlenecks
+SELECT COUNT(*) as executing_jobs 
+FROM ESP_GENERIC_JOB 
+WHERE STATUS = 'EXEC';
+
+-- @CHECK_ID: PERF-005
+-- @CHECK_NAME: Jobs Waiting to Run
+-- @CHECK_CATEGORY: Performance
+-- @SEVERITY: INFO
+-- @DESCRIPTION: Count jobs waiting to execute
+-- @THRESHOLD_OPERATOR: <
+-- @THRESHOLD_VALUE: 500
+-- @REMEDIATION: Check agent availability and resource constraints
+SELECT COUNT(*) as waiting_jobs 
+FROM ESP_GENERIC_JOB 
+WHERE STATUS = 'WAITING';
+
+-- ============================================================================
+-- SECTION 7: CALENDAR AND SCHEDULE CHECKS
+-- ============================================================================
+
+-- @CHECK_ID: CAL-001
+-- @CHECK_NAME: Active Calendars
+-- @CHECK_CATEGORY: Calendar
+-- @SEVERITY: INFO
+-- @DESCRIPTION: Count active calendars in the system
+-- @THRESHOLD_OPERATOR: >
+-- @THRESHOLD_VALUE: 0
+-- @REMEDIATION: Ensure calendars are properly defined
+SELECT COUNT(*) as active_calendars FROM ESP_CALENDAR;
+
+-- @CHECK_ID: CAL-002
+-- @CHECK_NAME: Expired Calendars
+-- @CHECK_CATEGORY: Calendar
+-- @SEVERITY: WARNING
+-- @DESCRIPTION: Find calendars that may need updating
+-- @THRESHOLD_OPERATOR: =
+-- @THRESHOLD_VALUE: 0
+-- @REMEDIATION: Review and update calendar definitions
+SELECT COUNT(*) as expired_calendars 
+FROM ESP_CALENDAR 
+WHERE END_DATE < CURRENT_TIMESTAMP;
+
+-- ============================================================================
+-- SECTION 8: RESOURCE MANAGER CHECKS
+-- ============================================================================
+
+-- @CHECK_ID: RM-001
+-- @CHECK_NAME: Total Resources
+-- @CHECK_CATEGORY: Resource
+-- @SEVERITY: INFO
+-- @DESCRIPTION: Count total resource definitions
+-- @THRESHOLD_OPERATOR: >=
+-- @THRESHOLD_VALUE: 0
+-- @REMEDIATION: Review resource definitions
+SELECT COUNT(*) as total_resources FROM ESP_RESOURCE;
+
+-- @CHECK_ID: RM-002
+-- @CHECK_NAME: Resource Conflicts
+-- @CHECK_CATEGORY: Resource
+-- @SEVERITY: WARNING
+-- @DESCRIPTION: Find resources with potential conflicts
+-- @THRESHOLD_OPERATOR: =
+-- @THRESHOLD_VALUE: 0
+-- @REMEDIATION: Resolve resource conflicts
+SELECT COUNT(*) as resource_conflicts 
+FROM ESP_RESOURCE 
+WHERE CURRENT_QUANTITY < 0;
+
+-- ============================================================================
+-- SECTION 9: SECURITY AND USER CHECKS
+-- ============================================================================
+
+-- @CHECK_ID: SEC-001
+-- @CHECK_NAME: Total Users
+-- @CHECK_CATEGORY: Security
+-- @SEVERITY: INFO
+-- @DESCRIPTION: Count total users in the system
+-- @THRESHOLD_OPERATOR: >
+-- @THRESHOLD_VALUE: 0
+-- @REMEDIATION: Review user accounts
+SELECT COUNT(*) as total_users FROM ESP_USER;
+
+-- @CHECK_ID: SEC-002
+-- @CHECK_NAME: Active Sessions
+-- @CHECK_CATEGORY: Security
+-- @SEVERITY: INFO
+-- @DESCRIPTION: Count active user sessions
+-- @THRESHOLD_OPERATOR: <
+-- @THRESHOLD_VALUE: 100
+-- @REMEDIATION: Monitor for unusual session activity
+SELECT COUNT(*) as active_sessions 
+FROM ESP_SESSION 
+WHERE STATUS = 'ACTIVE';
 
 -- ============================================================================
 -- SECTION 10: CUSTOM QUERIES (Add your own queries below)
@@ -290,10 +392,10 @@ AND END_TIME > CURRENT_TIMESTAMP - INTERVAL '24 hours';
 
 -- Example custom query:
 -- @CHECK_ID: CUSTOM-001
--- @CHECK_NAME: Your Custom Check
+-- @CHECK_NAME: dseries heat map based on the schedules
 -- @CHECK_CATEGORY: Custom
 -- @SEVERITY: INFO
--- @DESCRIPTION: Description of your custom check
+-- @DESCRIPTION: dseries heat map based on the schedules
 -- @THRESHOLD_OPERATOR: >
 -- @THRESHOLD_VALUE: 0
 -- @REMEDIATION: What to do if check fails

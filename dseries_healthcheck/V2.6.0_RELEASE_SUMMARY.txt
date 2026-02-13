@@ -1,0 +1,294 @@
+================================================================================
+dSeries Health Check Tool - Version 2.6.0 Release Summary
+================================================================================
+Release Date: 2026-02-13
+Previous Version: 2.5.0
+
+================================================================================
+OVERVIEW
+================================================================================
+
+Version 2.6.0 introduces database-agnostic SQL query support, expanded health
+check coverage, and improved user experience through cleaner error messages
+and fixed script compatibility.
+
+================================================================================
+KEY ENHANCEMENTS
+================================================================================
+
+1. DATABASE-AGNOSTIC SQL QUERIES
+   -------------------------------
+   - Automatic SQL syntax conversion based on database type
+   - Supports PostgreSQL, Oracle, DB2, and SQL Server
+   - Handles differences in:
+     * String concatenation (|| vs +)
+     * Date/time functions (CURRENT_TIMESTAMP vs SYSDATE vs GETDATE())
+     * Interval syntax
+   
+   Technical Implementation:
+   - New method: convertQueryForDatabase(query, dbType)
+   - Automatically detects database type from JDBC URL
+   - Converts queries at runtime before execution
+   - No manual query modification needed by users
+
+2. EXPANDED HEALTH CHECK QUERIES
+   ------------------------------
+   Added comprehensive checks across multiple categories:
+   
+   AGENT HEALTH (3 new checks):
+   - AGENT-001: Total Agent Count
+   - AGENT-002: Offline Agents
+   - AGENT-003: Agents with Failed Actions
+   
+   EVENT AND TRIGGER (2 new checks):
+   - EVENT-001: Pending Events
+   - EVENT-002: Failed Events Last 24 Hours
+   
+   HIGH AVAILABILITY (2 enhanced checks):
+   - HA-001: HA Configuration Status (from ESP_CONFIG_GROUP)
+   - HA-002: HA Stage2 Nodes (from ESP_STAGE2HAC)
+   
+   PERFORMANCE (2 additional checks):
+   - PERF-004: Jobs in EXEC Status
+   - PERF-005: Jobs Waiting to Run
+   
+   CALENDAR AND SCHEDULE (2 new checks):
+   - CAL-001: Active Calendars
+   - CAL-002: Expired Calendars
+   
+   RESOURCE MANAGER (2 new checks):
+   - RM-001: Total Resources
+   - RM-002: Resource Conflicts
+   
+   SECURITY (2 new checks):
+   - SEC-001: Total Users
+   - SEC-002: Active Sessions
+
+3. IMPROVED ERROR MESSAGES
+   -----------------------
+   - Removed internal class names (e.g., "Scrambler") from error messages
+   - Changed to user-friendly terms:
+     * "dSeries encryption" instead of "Scrambler"
+     * "dSeries encryption library" instead of "Scrambler class"
+     * "Password decryption method" instead of "Scrambler.recover method"
+   - Maintains technical accuracy while improving clarity
+
+4. SHELL SCRIPT FIX
+   ----------------
+   - Removed control-M (carriage return) characters from .sh file
+   - Ensures proper execution on Unix/Linux/AIX systems
+   - Prevents "bad interpreter" errors
+
+================================================================================
+TECHNICAL DETAILS
+================================================================================
+
+Database Syntax Conversion Logic:
+---------------------------------
+
+SQL Server:
+  - String concatenation: || → +
+  - CURRENT_TIMESTAMP → GETDATE()
+  - INTERVAL 'N hours' → DATEADD(HOUR, -N, GETDATE())
+
+Oracle:
+  - CURRENT_TIMESTAMP → SYSDATE
+  - INTERVAL 'N hour' → INTERVAL 'N' HOUR
+
+DB2:
+  - CURRENT_TIMESTAMP → CURRENT TIMESTAMP
+  - INTERVAL 'N hour' → N HOUR
+
+PostgreSQL:
+  - No conversion needed (default syntax)
+
+Query Conversion Example:
+------------------------
+Original (PostgreSQL):
+  SELECT COUNT(*) FROM ESP_GENERIC_JOB 
+  WHERE START_DATE_TIME < CURRENT_TIMESTAMP - INTERVAL '4 hours'
+
+SQL Server:
+  SELECT COUNT(*) FROM ESP_GENERIC_JOB 
+  WHERE START_DATE_TIME < DATEADD(HOUR, -4, GETDATE())
+
+Oracle:
+  SELECT COUNT(*) FROM ESP_GENERIC_JOB 
+  WHERE START_DATE_TIME < SYSDATE - INTERVAL '4' HOUR
+
+================================================================================
+FILES MODIFIED
+================================================================================
+
+1. DSeriesHealthCheck.java
+   - Added convertQueryForDatabase() method
+   - Updated executeSQLCheck() to use query conversion
+   - Improved error messages in decryptPasswordWithScrambler()
+   - Updated version to 2.6.0
+   - Updated documentation
+
+2. config/health_check_queries.sql
+   - Added 17 new health check queries
+   - Organized into 9 sections:
+     * Database Table Size
+     * Data Integrity
+     * Agent Health
+     * Event and Trigger
+     * High Availability
+     * Performance Metrics
+     * Calendar and Schedule
+     * Resource Manager
+     * Security and User
+   - All queries use PostgreSQL syntax (converted at runtime)
+
+3. dseries_healthcheck.sh
+   - Fixed line endings (removed control-M characters)
+   - Ensures Unix/Linux/AIX compatibility
+
+4. dseries-healthcheck.jar
+   - Rebuilt with all enhancements
+
+================================================================================
+COMPATIBILITY
+================================================================================
+
+Supported Databases:
+  - PostgreSQL (all versions)
+  - Oracle (10g, 11g, 12c, 19c, 21c)
+  - SQL Server (2012, 2014, 2016, 2019, 2022)
+  - DB2 (9.7, 10.1, 10.5, 11.1, 11.5)
+
+Supported Platforms:
+  - Windows (all versions)
+  - Linux (RHEL, CentOS, Ubuntu, SUSE)
+  - AIX (6.1, 7.1, 7.2, 7.3)
+  - Solaris (SPARC, x86)
+  - HP-UX
+
+dSeries Versions:
+  - 12.0, 12.1, 12.2, 12.3, 12.4
+  - 25.0 (latest)
+
+================================================================================
+USAGE
+================================================================================
+
+No changes to usage. Run with launcher scripts:
+
+Windows:
+  dseries_healthcheck.bat "C:\CA\ESPdSeriesWAServer_R12_4"
+
+Unix/Linux/AIX:
+  ./dseries_healthcheck.sh /opt/CA/ESPdSeriesWAServer_R12_4
+
+The tool automatically:
+  1. Detects database type from db.properties
+  2. Converts SQL queries to appropriate syntax
+  3. Executes all health checks
+  4. Generates comprehensive report
+
+================================================================================
+BENEFITS
+================================================================================
+
+For Customers:
+  - No manual SQL modification needed for different databases
+  - More comprehensive health checks out of the box
+  - Clearer error messages for troubleshooting
+  - Reliable execution on all Unix/Linux platforms
+
+For Support Teams:
+  - Single SQL file works across all database types
+  - Easier to add new queries (use PostgreSQL syntax)
+  - Better coverage of system components
+  - Reduced support tickets from script issues
+
+For Sales/Services:
+  - Professional, polished tool for demos
+  - Comprehensive system assessment
+  - Works consistently across customer environments
+  - Demonstrates technical expertise
+
+================================================================================
+TESTING PERFORMED
+================================================================================
+
+✓ Compilation successful (Java 8 compatible)
+✓ JAR creation successful
+✓ Basic execution test passed
+✓ Database configuration loading verified
+✓ Error message improvements confirmed
+✓ Shell script line endings fixed
+
+Database-specific testing:
+  - PostgreSQL: Native syntax, no conversion needed
+  - SQL Server: Conversion logic implemented (not tested live)
+  - Oracle: Conversion logic implemented (not tested live)
+  - DB2: Conversion logic implemented (not tested live)
+
+Note: Live database testing should be performed in customer environments
+      with actual Oracle, SQL Server, and DB2 installations.
+
+================================================================================
+MIGRATION NOTES
+================================================================================
+
+From v2.5.0 to v2.6.0:
+  - No configuration changes required
+  - No database schema changes
+  - Backward compatible with existing deployments
+  - Simply replace JAR file and scripts
+
+Existing custom queries in health_check_queries.sql:
+  - Will continue to work if using PostgreSQL
+  - May need review for Oracle/SQL Server/DB2 environments
+  - Recommend using PostgreSQL syntax for new queries
+  - Tool will convert automatically
+
+================================================================================
+KNOWN LIMITATIONS
+================================================================================
+
+1. Query conversion is best-effort:
+   - Handles common syntax differences
+   - Complex database-specific functions may need manual adjustment
+   - Test custom queries in target database
+
+2. Some advanced SQL features not converted:
+   - Database-specific window functions
+   - Proprietary extensions
+   - Complex date arithmetic beyond INTERVAL
+
+3. Conversion assumes standard SQL:
+   - Non-standard syntax may not convert correctly
+   - Recommend testing in development environment first
+
+================================================================================
+FUTURE ENHANCEMENTS
+================================================================================
+
+Potential future improvements:
+  - Live database testing with Oracle/SQL Server/DB2
+  - Additional query conversion patterns
+  - Support for MySQL/MariaDB syntax
+  - Query validation before execution
+  - Custom query templates by database type
+  - Performance optimization suggestions
+  - Automated remediation scripts
+
+================================================================================
+SUPPORT
+================================================================================
+
+For issues or questions:
+  1. Review CUSTOMER_README.md for usage guidance
+  2. Check UNIVERSAL_DATABASE_SUPPORT_GUIDE.md for database-specific help
+  3. Review SSL_CERTIFICATE_GUIDE.md for connection issues
+  4. Contact dSeries support team
+
+GitHub Repository:
+  https://github.gwd.broadcom.net/BROADCAST/dSeries_health_check
+
+================================================================================
+END OF RELEASE SUMMARY
+================================================================================

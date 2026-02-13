@@ -15,8 +15,14 @@ import java.security.GeneralSecurityException;
  * Performs technical reviews including architecture, security, database,
  * agents, clients, high availability, and performance checks.
  * 
- * Version: 2.4.0
- * Date: 2026-02-12
+ * Version: 2.6.0
+ * Date: 2026-02-13
+ * 
+ * Version 2.6.0 Enhancements:
+ * - Database-agnostic SQL query conversion (PostgreSQL, Oracle, DB2, SQL Server)
+ * - Additional health check queries (agents, events, calendars, resources, security)
+ * - Improved error messages (removed internal class names)
+ * - Fixed line endings in shell script
  * 
  * Version 2.4.0 Enhancements:
  * - SSL/TLS certificate support (trustStore, trustStorePassword)
@@ -1134,7 +1140,10 @@ public class DSeriesHealthCheck {
             // Set query timeout (30 seconds)
             stmt.setQueryTimeout(30);
             
-            rs = stmt.executeQuery(check.query);
+            // Convert query for target database type
+            String convertedQuery = convertQueryForDatabase(check.query, dbType);
+            
+            rs = stmt.executeQuery(convertedQuery);
             
             queryEndTime = System.currentTimeMillis();
             long queryTime = queryEndTime - queryStartTime;
@@ -1407,8 +1416,8 @@ public class DSeriesHealthCheck {
             return "";
         }
         
-        // Try dSeries Scrambler first (used by DBConnectionValidator)
-        System.out.println("  ℹ️  Attempting password decryption using dSeries Scrambler");
+        // Try dSeries native encryption first (used by DBConnectionValidator)
+        System.out.println("  ℹ️  Attempting password decryption using dSeries encryption");
         String decrypted = decryptPasswordWithScrambler(encryptedPassword);
         if (!decrypted.isEmpty()) {
             return decrypted;
@@ -1623,6 +1632,52 @@ public class DSeriesHealthCheck {
     }
     
     /**
+     * Convert SQL query to database-specific syntax
+     * Handles differences in string concatenation, date functions, etc.
+     * 
+     * @param query Original query (PostgreSQL syntax)
+     * @param targetDbType Target database type
+     * @return Converted query
+     */
+    private static String convertQueryForDatabase(String query, String targetDbType) {
+        if (targetDbType == null || targetDbType.isEmpty()) {
+            return query;
+        }
+        
+        String converted = query;
+        String dbType = targetDbType.toLowerCase();
+        
+        // SQL Server specific conversions
+        if (dbType.contains("sqlserver") || dbType.equals("mssql")) {
+            // String concatenation: || to +
+            converted = converted.replaceAll("'%'\\s*\\|\\|\\s*", "'%' + ");
+            converted = converted.replaceAll("\\|\\|\\s*'%'", " + '%'");
+            
+            // Date/Time functions
+            converted = converted.replace("CURRENT_TIMESTAMP", "GETDATE()");
+            converted = converted.replaceAll("INTERVAL\\s+'(\\d+)\\s+(\\w+)'", "DATEADD($2, -$1, GETDATE())");
+        }
+        
+        // Oracle specific conversions
+        else if (dbType.contains("oracle")) {
+            // Date/Time functions
+            converted = converted.replace("CURRENT_TIMESTAMP", "SYSDATE");
+            converted = converted.replaceAll("INTERVAL\\s+'(\\d+)\\s+hour'", "INTERVAL '$1' HOUR");
+            converted = converted.replaceAll("INTERVAL\\s+'(\\d+)\\s+day'", "INTERVAL '$1' DAY");
+        }
+        
+        // DB2 specific conversions
+        else if (dbType.contains("db2")) {
+            // Date/Time functions
+            converted = converted.replace("CURRENT_TIMESTAMP", "CURRENT TIMESTAMP");
+            converted = converted.replaceAll("INTERVAL\\s+'(\\d+)\\s+hour'", "$1 HOUR");
+            converted = converted.replaceAll("INTERVAL\\s+'(\\d+)\\s+day'", "$1 DAY");
+        }
+        
+        return converted;
+    }
+    
+    /**
      * Find and load JDBC driver from dSeries lib directory
      * This method searches for JDBC driver JARs and adds them to classpath dynamically
      * 
@@ -1755,22 +1810,22 @@ public class DSeriesHealthCheck {
      */
     private static String decryptPasswordWithScrambler(String encryptedPassword) {
         try {
-            // Use reflection to call Scrambler.recover(password, "RelationalDatabaseManager")
+            // Use reflection to call dSeries native password decryption
             Class<?> scramblerClass = Class.forName("com.ca.wa.publiclibrary.engine.library.crypto.Scrambler");
             java.lang.reflect.Method recoverMethod = scramblerClass.getMethod("recover", String.class, String.class);
             Object result = recoverMethod.invoke(null, encryptedPassword, "RelationalDatabaseManager");
             
             if (result != null) {
-                System.out.println("  ✅ Password decrypted successfully using dSeries Scrambler");
+                System.out.println("  ✅ Password decrypted successfully using dSeries encryption");
                 return result.toString();
             }
         } catch (ClassNotFoundException e) {
-            System.out.println("  ⚠️  Scrambler class not found in classpath");
+            System.out.println("  ⚠️  dSeries encryption library not found in classpath");
             System.out.println("  Note: Ensure dSeries libraries are in classpath (use launcher scripts)");
         } catch (NoSuchMethodException e) {
-            System.out.println("  ⚠️  Scrambler.recover method not found");
+            System.out.println("  ⚠️  Password decryption method not available");
         } catch (Exception e) {
-            System.out.println("  ⚠️  Scrambler decryption failed: " + e.getMessage());
+            System.out.println("  ⚠️  Password decryption failed: " + e.getMessage());
             if (e.getCause() != null) {
                 System.out.println("  Cause: " + e.getCause().getMessage());
             }
