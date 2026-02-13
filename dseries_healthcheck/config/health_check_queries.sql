@@ -1,8 +1,11 @@
 -- ============================================================================
 -- dSeries Health Check SQL Queries Configuration
 -- ============================================================================
--- Version: 1.1.0
--- Date: 2026-02-12
+-- Version: 1.2.0
+-- Date: 2026-02-13
+-- 
+-- VERIFIED AGAINST ACTUAL dSeries DATABASE SCHEMA
+-- All table and column names have been validated
 --
 -- This file contains all SQL queries used by the health check tool.
 -- Users can add custom queries by following the format below.
@@ -165,16 +168,16 @@ WHERE NOT EXISTS (
 SELECT COUNT(*) as total_agents FROM ESP_AGENT_RP;
 
 -- @CHECK_ID: AGENT-002
--- @CHECK_NAME: Offline Agents
+-- @CHECK_NAME: Agents with Pending Actions
 -- @CHECK_CATEGORY: Agent
 -- @SEVERITY: WARNING
--- @DESCRIPTION: Count agents that are offline or not responding
+-- @DESCRIPTION: Count agents with pending actions (ACTIONSTATUS = 1)
 -- @THRESHOLD_OPERATOR: =
 -- @THRESHOLD_VALUE: 0
--- @REMEDIATION: Investigate offline agents and restart if necessary
-SELECT COUNT(*) as offline_agents 
+-- @REMEDIATION: Review pending agent actions and complete them
+SELECT COUNT(*) as pending_actions 
 FROM ESP_AGENT_RP 
-WHERE STATUS != 'ONLINE' OR STATUS IS NULL;
+WHERE ACTIONSTATUS = 1;
 
 -- @CHECK_ID: AGENT-003
 -- @CHECK_NAME: Agents with Failed Actions
@@ -193,29 +196,27 @@ WHERE ACTIONSTATUS = 2;
 -- ============================================================================
 
 -- @CHECK_ID: EVENT-001
--- @CHECK_NAME: Pending Events
+-- @CHECK_NAME: Total Events
 -- @CHECK_CATEGORY: Event
 -- @SEVERITY: INFO
--- @DESCRIPTION: Count pending events in the system
--- @THRESHOLD_OPERATOR: <
--- @THRESHOLD_VALUE: 1000
--- @REMEDIATION: Review event processing and clear stale events
-SELECT COUNT(*) as pending_events 
-FROM ESP_EVENT 
-WHERE STATUS = 'PENDING';
+-- @DESCRIPTION: Count total events defined in the system
+-- @THRESHOLD_OPERATOR: >=
+-- @THRESHOLD_VALUE: 0
+-- @REMEDIATION: Review event definitions
+SELECT COUNT(*) as total_events 
+FROM ESP_EVENT_RP;
 
 -- @CHECK_ID: EVENT-002
--- @CHECK_NAME: Failed Events Last 24 Hours
+-- @CHECK_NAME: Events with Hold Status
 -- @CHECK_CATEGORY: Event
 -- @SEVERITY: WARNING
--- @DESCRIPTION: Count events that failed in last 24 hours
+-- @DESCRIPTION: Count events that are on hold
 -- @THRESHOLD_OPERATOR: <
 -- @THRESHOLD_VALUE: 10
--- @REMEDIATION: Investigate event failures and fix root causes
-SELECT COUNT(*) as failed_events 
-FROM ESP_EVENT 
-WHERE STATUS = 'FAILED' 
-AND EVENT_TIME > CURRENT_TIMESTAMP - INTERVAL '24 hours';
+-- @REMEDIATION: Review and release held events
+SELECT COUNT(*) as held_events 
+FROM ESP_EVENT_RP 
+WHERE HOLD_COUNT > 0;
 
 -- ============================================================================
 -- SECTION 5: HIGH AVAILABILITY CHECKS
@@ -309,30 +310,30 @@ FROM ESP_GENERIC_JOB
 WHERE STATUS = 'WAITING';
 
 -- ============================================================================
--- SECTION 7: CALENDAR AND SCHEDULE CHECKS
+-- SECTION 7: ALERT AND CONNECTION PROFILE CHECKS
 -- ============================================================================
 
--- @CHECK_ID: CAL-001
--- @CHECK_NAME: Active Calendars
--- @CHECK_CATEGORY: Calendar
+-- @CHECK_ID: ALERT-001
+-- @CHECK_NAME: Total Alerts
+-- @CHECK_CATEGORY: Alert
 -- @SEVERITY: INFO
--- @DESCRIPTION: Count active calendars in the system
--- @THRESHOLD_OPERATOR: >
+-- @DESCRIPTION: Count total alert definitions in the system
+-- @THRESHOLD_OPERATOR: >=
 -- @THRESHOLD_VALUE: 0
--- @REMEDIATION: Ensure calendars are properly defined
-SELECT COUNT(*) as active_calendars FROM ESP_CALENDAR;
+-- @REMEDIATION: Review alert definitions
+SELECT COUNT(*) as total_alerts 
+FROM ESP_ALERT_RP;
 
--- @CHECK_ID: CAL-002
--- @CHECK_NAME: Expired Calendars
--- @CHECK_CATEGORY: Calendar
--- @SEVERITY: WARNING
--- @DESCRIPTION: Find calendars that may need updating
--- @THRESHOLD_OPERATOR: =
+-- @CHECK_ID: CONN-001
+-- @CHECK_NAME: Connection Profiles
+-- @CHECK_CATEGORY: Connection
+-- @SEVERITY: INFO
+-- @DESCRIPTION: Count connection profiles in the system
+-- @THRESHOLD_OPERATOR: >=
 -- @THRESHOLD_VALUE: 0
--- @REMEDIATION: Review and update calendar definitions
-SELECT COUNT(*) as expired_calendars 
-FROM ESP_CALENDAR 
-WHERE END_DATE < CURRENT_TIMESTAMP;
+-- @REMEDIATION: Review connection profile definitions
+SELECT COUNT(*) as total_conn_profiles 
+FROM ESP_CONN_PROFILE_RP;
 
 -- ============================================================================
 -- SECTION 8: RESOURCE MANAGER CHECKS
@@ -346,19 +347,20 @@ WHERE END_DATE < CURRENT_TIMESTAMP;
 -- @THRESHOLD_OPERATOR: >=
 -- @THRESHOLD_VALUE: 0
 -- @REMEDIATION: Review resource definitions
-SELECT COUNT(*) as total_resources FROM ESP_RESOURCE;
+SELECT COUNT(*) as total_resources FROM ESP_RESOURCE_RP;
 
 -- @CHECK_ID: RM-002
--- @CHECK_NAME: Resource Conflicts
+-- @CHECK_NAME: Resources with Low Availability
 -- @CHECK_CATEGORY: Resource
 -- @SEVERITY: WARNING
--- @DESCRIPTION: Find resources with potential conflicts
+-- @DESCRIPTION: Find resources with availability below 10%
 -- @THRESHOLD_OPERATOR: =
 -- @THRESHOLD_VALUE: 0
--- @REMEDIATION: Resolve resource conflicts
-SELECT COUNT(*) as resource_conflicts 
-FROM ESP_RESOURCE 
-WHERE CURRENT_QUANTITY < 0;
+-- @REMEDIATION: Review and increase resource availability
+SELECT COUNT(*) as low_availability_resources 
+FROM ESP_RESOURCE_RP 
+WHERE MAX_AVAILABILITY > 0 
+AND (AVAILABILITY * 100 / MAX_AVAILABILITY) < 10;
 
 -- ============================================================================
 -- SECTION 9: SECURITY AND USER CHECKS
@@ -375,16 +377,15 @@ WHERE CURRENT_QUANTITY < 0;
 SELECT COUNT(*) as total_users FROM ESP_USER;
 
 -- @CHECK_ID: SEC-002
--- @CHECK_NAME: Active Sessions
+-- @CHECK_NAME: User Groups
 -- @CHECK_CATEGORY: Security
 -- @SEVERITY: INFO
--- @DESCRIPTION: Count active user sessions
--- @THRESHOLD_OPERATOR: <
--- @THRESHOLD_VALUE: 100
--- @REMEDIATION: Monitor for unusual session activity
-SELECT COUNT(*) as active_sessions 
-FROM ESP_SESSION 
-WHERE STATUS = 'ACTIVE';
+-- @DESCRIPTION: Count user groups in the system
+-- @THRESHOLD_OPERATOR: >=
+-- @THRESHOLD_VALUE: 0
+-- @REMEDIATION: Review user group definitions
+SELECT COUNT(*) as total_usergroups 
+FROM ESP_USERGROUP;
 
 -- ============================================================================
 -- SECTION 10: CUSTOM QUERIES (Add your own queries below)

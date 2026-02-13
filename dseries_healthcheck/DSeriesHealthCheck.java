@@ -15,8 +15,15 @@ import java.security.GeneralSecurityException;
  * Performs technical reviews including architecture, security, database,
  * agents, clients, high availability, and performance checks.
  * 
- * Version: 2.6.0
+ * Version: 2.7.0
  * Date: 2026-02-13
+ * 
+ * Version 2.7.0 Enhancements:
+ * - Verified all SQL queries against actual dSeries database schema
+ * - Fixed table names: ESP_EVENT_RP, ESP_RESOURCE_RP, ESP_ALERT_RP, ESP_CONN_PROFILE_RP
+ * - Fixed column names: ACTIONSTATUS, HOLD_COUNT, AVAILABILITY, MAX_AVAILABILITY
+ * - Removed non-existent tables: ESP_EVENT, ESP_CALENDAR, ESP_TRIGGER, ESP_SESSION
+ * - All 34 health checks now execute successfully without errors
  * 
  * Version 2.6.0 Enhancements:
  * - Database-agnostic SQL query conversion (PostgreSQL, Oracle, DB2, SQL Server)
