@@ -15,8 +15,14 @@ import java.security.GeneralSecurityException;
  * Performs technical reviews including architecture, security, database,
  * agents, clients, high availability, and performance checks.
  * 
- * Version: 2.9.0
+ * Version: 2.10.0
  * Date: 2026-02-13
+ * 
+ * Version 2.10.0 Enhancements:
+ * - Enhanced password decryption with RelationalDatabaseManager key lookup
+ * - Added Base64 password detection and decryption
+ * - Improved error handling for InvocationTargetException
+ * - Better debugging for password decryption failures
  * 
  * Version 2.9.0 Enhancements:
  * - Fixed Oracle JDBC URL handling (now uses original URL from db.properties)
@@ -1529,6 +1535,22 @@ public class DSeriesHealthCheck {
                 }
             }
             
+            // Check if password looks encrypted (contains only Base64 chars and ==)
+            // If it looks like Base64, try to decode it
+            if (encryptedPassword.matches("^[A-Za-z0-9+/]+=*$") && encryptedPassword.length() > 10) {
+                try {
+                    byte[] decodedBytes = java.util.Base64.getDecoder().decode(encryptedPassword);
+                    String decoded = new String(decodedBytes);
+                    // If decoded string is printable, it might be the password
+                    if (decoded.matches("^[\\x20-\\x7E]+$")) {
+                        System.out.println("  ℹ️  Password appears to be Base64 encoded, decoded successfully");
+                        return decoded;
+                    }
+                } catch (Exception e) {
+                    // Not valid Base64, treat as plain text
+                }
+            }
+            
             // Assume plain text
             System.out.println("  ℹ️  Using plain text password (no encryption detected)");
             return encryptedPassword;
@@ -1860,10 +1882,24 @@ public class DSeriesHealthCheck {
         try {
             // Use reflection to call dSeries native password decryption
             Class<?> scramblerClass = Class.forName("com.ca.wa.publiclibrary.engine.library.crypto.Scrambler");
-            java.lang.reflect.Method recoverMethod = scramblerClass.getMethod("recover", String.class, String.class);
-            Object result = recoverMethod.invoke(null, encryptedPassword, "RelationalDatabaseManager");
             
-            if (result != null) {
+            // Try to get the key from RelationalDatabaseManager if available
+            String key = "RelationalDatabaseManager";
+            try {
+                Class<?> rdbmClass = Class.forName("com.ca.wa.core.engine.rdbms.RelationalDatabaseManager");
+                java.lang.reflect.Method getKeyMethod = rdbmClass.getMethod("getKey");
+                Object keyResult = getKeyMethod.invoke(null);
+                if (keyResult != null) {
+                    key = keyResult.toString();
+                }
+            } catch (Exception e) {
+                // Use default key if RelationalDatabaseManager not available
+            }
+            
+            java.lang.reflect.Method recoverMethod = scramblerClass.getMethod("recover", String.class, String.class);
+            Object result = recoverMethod.invoke(null, encryptedPassword, key);
+            
+            if (result != null && !result.toString().isEmpty()) {
                 System.out.println("  ✅ Password decrypted successfully using dSeries encryption");
                 return result.toString();
             }
@@ -1872,11 +1908,15 @@ public class DSeriesHealthCheck {
             System.out.println("  Note: Ensure dSeries libraries are in classpath (use launcher scripts)");
         } catch (NoSuchMethodException e) {
             System.out.println("  ⚠️  Password decryption method not available");
+        } catch (java.lang.reflect.InvocationTargetException e) {
+            Throwable cause = e.getCause();
+            if (cause != null) {
+                System.out.println("  ⚠️  Password decryption failed: " + cause.getMessage());
+            } else {
+                System.out.println("  ⚠️  Password decryption failed: " + e.getMessage());
+            }
         } catch (Exception e) {
             System.out.println("  ⚠️  Password decryption failed: " + e.getMessage());
-            if (e.getCause() != null) {
-                System.out.println("  Cause: " + e.getCause().getMessage());
-            }
         }
         
         return "";
