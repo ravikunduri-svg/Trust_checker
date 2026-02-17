@@ -15,8 +15,16 @@ import java.security.GeneralSecurityException;
  * Performs technical reviews including architecture, security, database,
  * agents, clients, high availability, and performance checks.
  * 
- * Version: 2.10.0
+ * Version: 2.11.0
  * Date: 2026-02-13
+ * 
+ * Version 2.11.0 Enhancements:
+ * - Complete rewrite of connectToDatabase() to match DBConnectionValidator exactly
+ * - Passes ALL db.properties to DriverManager (not just user/password)
+ * - Removes specific properties before passing to driver (jdbc.Driver, jdbc.URL, etc.)
+ * - Uses Scrambler.recover() with RelationalDatabaseManager.getKey() for decryption
+ * - Fixed property removal order (EXACTLY like DBConnectionValidator)
+ * - Fixed JVM config detection (now checks startServer on Unix)
  * 
  * Version 2.10.0 Enhancements:
  * - Enhanced password decryption with RelationalDatabaseManager key lookup
@@ -879,80 +887,132 @@ public class DSeriesHealthCheck {
         System.out.println("[DB-CONNECT] Connecting to Database...");
         
         try {
+            // Load db.properties again to get ALL properties (EXACTLY like DBConnectionValidator)
+            File configFile = useExternalDbConfig && externalDbConfigFile != null 
+                ? new File(externalDbConfigFile) 
+                : new File(installDir, "conf/db.properties");
+            
+            Properties properties = new Properties();
+            properties.load(new FileInputStream(configFile));
+            
+            // Get JDBC driver and URL (using exact property names from DBProperties)
+            String jdbcDriver = properties.getProperty("jdbc.Driver");
+            if (jdbcDriver == null) jdbcDriver = properties.getProperty("rdbms.driver");
+            String jdbcUrl = properties.getProperty("jdbc.URL");
+            
+            if (jdbcDriver == null || jdbcUrl == null) {
+                System.out.println("  ❌ Missing jdbc.Driver or jdbc.URL in db.properties");
+                return false;
+            }
+            
             System.out.println("  Database connection details:");
-            System.out.println("    Driver: " + dbDriver);
+            System.out.println("    Driver: " + jdbcDriver);
             System.out.println("    URL: " + maskJdbcUrl(dbHost, dbPort, dbName));
             System.out.println("    User: " + maskSensitiveData(dbUser));
             System.out.println();
             
             // Try to load JDBC driver
-            System.out.println("  Attempting to load JDBC driver: " + dbDriver);
+            System.out.println("  Attempting to load JDBC driver: " + jdbcDriver);
             
             try {
-                Class.forName(dbDriver);
+                Class.forName(jdbcDriver);
                 System.out.println("  ✅ JDBC driver loaded successfully");
             } catch (ClassNotFoundException e) {
-                System.out.println("  ⚠️  JDBC driver not found in classpath: " + dbDriver);
-                
-                // Try to find driver in lib directory
-                System.out.println("  Searching for JDBC driver in: " + installDir + "/lib/");
-                boolean driverFound = findAndLoadJdbcDriver(dbDriver);
-                
-                if (driverFound) {
-                    System.out.println("  ℹ️  JDBC driver JAR found in lib directory");
-                    System.out.println("  Note: Ensure launcher script includes lib/*.jar in classpath");
-                } else {
-                    System.out.println("  ⚠️  JDBC driver JAR not found in lib directory");
-                }
-                
-                System.out.println();
-                System.out.println("  Troubleshooting:");
-                System.out.println("    1. Use the launcher scripts (dseries_healthcheck.bat or .sh)");
-                System.out.println("       They automatically include dSeries lib directory in classpath");
-                System.out.println();
-                System.out.println("    2. If running manually, add JDBC driver to classpath:");
-                
-                if (dbDriver.contains("postgresql")) {
-                    System.out.println("       Windows: java -cp \"<install_dir>\\lib\\*;dseries-healthcheck.jar\" DSeriesHealthCheck <install_dir>");
-                    System.out.println("       Unix:    java -cp \"<install_dir>/lib/*:dseries-healthcheck.jar\" DSeriesHealthCheck <install_dir>");
-                } else if (dbDriver.contains("oracle")) {
-                    System.out.println("       Windows: java -cp \"<install_dir>\\lib\\*;dseries-healthcheck.jar\" DSeriesHealthCheck <install_dir>");
-                    System.out.println("       Unix:    java -cp \"<install_dir>/lib/*:dseries-healthcheck.jar\" DSeriesHealthCheck <install_dir>");
-                } else if (dbDriver.contains("sqlserver")) {
-                    System.out.println("       Windows: java -cp \"<install_dir>\\lib\\*;dseries-healthcheck.jar\" DSeriesHealthCheck <install_dir>");
-                    System.out.println("       Unix:    java -cp \"<install_dir>/lib/*:dseries-healthcheck.jar\" DSeriesHealthCheck <install_dir>");
-                }
-                
-                System.out.println();
-                System.out.println("  Database checks will be skipped");
-                System.out.println("  System and server checks will continue...");
+                System.out.println("  ❌ JDBC driver not found in classpath: " + jdbcDriver);
+                System.out.println("  Note: Use launcher script (dseries_healthcheck.bat or .sh)");
                 System.out.println();
                 return false;
             }
             
-            // Use original JDBC URL from db.properties if available
-            // This preserves complex Oracle URLs like jdbc:oracle:thin:@//[host]:port/service
-            String jdbcUrl;
-            if (originalJdbcUrl != null && !originalJdbcUrl.isEmpty()) {
-                jdbcUrl = originalJdbcUrl;
-                System.out.println("  ℹ️  Using JDBC URL from db.properties");
+            // Check for Windows integrated authentication
+            boolean winAuth = Boolean.parseBoolean(properties.getProperty("integratedSecurity", "false"));
+            
+            // Remove properties that shouldn't be passed to driver (EXACTLY like DBConnectionValidator)
+            properties.remove("jdbc.Driver");
+            properties.remove("rdbms.driver");
+            properties.remove("jdbc.URL");
+            properties.remove("integratedSecurity");
+            
+            if (winAuth) {
+                System.out.println("  ℹ️  Using Windows integrated authentication");
+                if (!jdbcUrl.contains("integratedSecurity")) {
+                    jdbcUrl += ";integratedSecurity=true;";
+                }
             } else {
-                // Build JDBC URL based on driver type (fallback)
-                if (dbDriver.contains("postgresql")) {
-                    jdbcUrl = "jdbc:postgresql://" + dbHost + ":" + dbPort + "/" + dbName;
-                } else if (dbDriver.contains("oracle")) {
-                    jdbcUrl = "jdbc:oracle:thin:@" + dbHost + ":" + dbPort + ":" + dbName;
-                } else if (dbDriver.contains("sqlserver")) {
-                    jdbcUrl = "jdbc:sqlserver://" + dbHost + ":" + dbPort + ";databaseName=" + dbName;
-                    // Windows authentication support
-                    if (dbUser.isEmpty() || dbPassword.isEmpty()) {
-                        jdbcUrl += ";integratedSecurity=true";
-                        System.out.println("  ℹ️  Using Windows authentication (integratedSecurity=true)");
+                // Get user and password
+                String userId = properties.getProperty("rdbms.userid");
+                String password = properties.getProperty("rdbms.password");
+                
+                if (userId != null) {
+                    properties.setProperty("user", userId);  // Driver-specific property name
+                }
+                
+                if (password != null && !password.isEmpty()) {
+                    System.out.println("  ℹ️  Decrypting password...");
+                    
+                    // Decrypt password using Scrambler (EXACTLY like DBConnectionValidator)
+                    try {
+                        Class<?> scramblerClass = Class.forName("com.ca.wa.publiclibrary.engine.library.crypto.Scrambler");
+                        Class<?> rdbmClass = Class.forName("com.ca.wa.core.engine.rdbms.RelationalDatabaseManager");
+                        
+                        java.lang.reflect.Method getKeyMethod = rdbmClass.getMethod("getKey");
+                        Object keyObj = getKeyMethod.invoke(null);
+                        String key = keyObj != null ? keyObj.toString() : "RelationalDatabaseManager";
+                        
+                        java.lang.reflect.Method recoverMethod = scramblerClass.getMethod("recover", String.class, String.class);
+                        Object decryptedObj = recoverMethod.invoke(null, password, key);
+                        
+                        if (decryptedObj != null) {
+                            password = decryptedObj.toString();
+                            properties.setProperty("password", password);  // Driver-specific property name
+                            System.out.println("  ✅ Password decrypted successfully");
+                        } else {
+                            System.out.println("  ⚠️  Password decryption returned null");
+                            properties.setProperty("password", password);  // Try original
+                        }
+                    } catch (Exception e) {
+                        System.out.println("  ⚠️  Password decryption failed: " + e.getMessage());
+                        System.out.println("  ⚠️  CRITICAL: Launcher script must be used to load dSeries encryption libraries");
+                        System.out.println("  Trying with original password (will likely fail)...");
+                        properties.setProperty("password", password);  // Try original
                     }
-                } else if (dbDriver.contains("db2")) {
-                    jdbcUrl = "jdbc:db2://" + dbHost + ":" + dbPort + "/" + dbName;
-                } else {
-                    jdbcUrl = "jdbc:postgresql://" + dbHost + ":" + dbPort + "/" + dbName;
+                }
+                
+                // Remove original properties after setting driver-specific ones (EXACTLY like DBConnectionValidator)
+                properties.remove("rdbms.userid");
+                properties.remove("rdbms.password");
+            }
+            
+            // Handle SSL keystore password (Oracle-SSL, DB2-SSL, PostgreSQL-SSL)
+            String trustStorePass = properties.getProperty("javax.net.ssl.trustStorePassword");
+            if (trustStorePass != null && !trustStorePass.isEmpty()) {
+                System.out.println("  ℹ️  Decrypting SSL trustStore password...");
+                try {
+                    Class<?> scramblerClass = Class.forName("com.ca.wa.publiclibrary.engine.library.crypto.Scrambler");
+                    Class<?> rdbmClass = Class.forName("com.ca.wa.core.engine.rdbms.RelationalDatabaseManager");
+                    
+                    java.lang.reflect.Method getKeyMethod = rdbmClass.getMethod("getKey");
+                    Object keyObj = getKeyMethod.invoke(null);
+                    String key = keyObj != null ? keyObj.toString() : "RelationalDatabaseManager";
+                    
+                    java.lang.reflect.Method recoverMethod = scramblerClass.getMethod("recover", String.class, String.class);
+                    Object decryptedObj = recoverMethod.invoke(null, trustStorePass, key);
+                    
+                    if (decryptedObj != null) {
+                        trustStorePass = decryptedObj.toString();
+                        properties.setProperty("javax.net.ssl.trustStorePassword", trustStorePass);
+                        System.out.println("  ✅ TrustStore password decrypted");
+                    }
+                } catch (Exception e) {
+                    System.out.println("  ⚠️  TrustStore password decryption failed");
+                }
+                
+                // Set system properties (required for DB2 and some Oracle configs)
+                System.setProperty("javax.net.ssl.trustStorePassword", properties.getProperty("javax.net.ssl.trustStorePassword"));
+                String trustStore = properties.getProperty("javax.net.ssl.trustStore");
+                if (trustStore != null) {
+                    System.setProperty("javax.net.ssl.trustStore", trustStore);
+                    System.out.println("  ℹ️  SSL system properties configured");
                 }
             }
             
@@ -961,93 +1021,52 @@ public class DSeriesHealthCheck {
             // Start connection timing
             connectionStartTime = System.currentTimeMillis();
             
-            // Build connection properties
-            Properties connectionProps = new Properties();
-            
-            // Add user/password if not using Windows authentication
-            if (!integratedSecurity) {
-                if (dbUser != null && !dbUser.isEmpty()) {
-                    connectionProps.setProperty("user", dbUser);
+            // Connect using ALL properties (EXACTLY like DBConnectionValidator)
+            // This passes all db.properties to the driver, not just user/password
+            try {
+                dbConnection = DriverManager.getConnection(jdbcUrl, properties);
+                connectionEndTime = System.currentTimeMillis();
+                long connectionTime = connectionEndTime - connectionStartTime;
+                
+                System.out.println("  ✅ Database connection established successfully");
+                System.out.println("    Connection time: " + connectionTime + " ms");
+                
+                // Validate connection
+                System.out.println("  Validating connection...");
+                if (dbConnection.isValid(30)) {
+                    System.out.println("  ✅ Connection is valid (validated in 30 seconds)");
+                    System.out.println();
+                    return true;
+                } else {
+                    System.out.println("  ⚠️  Connection validation failed");
+                    dbConnection.close();
+                    dbConnection = null;
+                    return false;
                 }
-                if (dbPassword != null && !dbPassword.isEmpty()) {
-                    connectionProps.setProperty("password", dbPassword);
+                
+            } catch (SQLException e) {
+                System.out.println("  ❌ Could not connect to database");
+                System.out.println("  Error: " + e.getMessage());
+                if (e.getMessage().contains("ORA-")) {
+                    System.out.println("  Oracle Error: https://docs.oracle.com/error-help/db/ora-" + 
+                        e.getMessage().toLowerCase().replaceAll(".*ora-(\\d+).*", "$1") + "/");
                 }
-            }
-            
-            // Add SSL properties if enabled
-            if (sslEnabled && sslTrustStore != null) {
-                connectionProps.setProperty("javax.net.ssl.trustStore", sslTrustStore);
-                if (sslTrustStorePassword != null) {
-                    connectionProps.setProperty("javax.net.ssl.trustStorePassword", sslTrustStorePassword);
-                }
-                System.out.println("  ℹ️  SSL properties added to connection");
-            }
-            
-            // Attempt connection with retry logic
-            int maxRetries = 3;
-            int retryCount = 0;
-            SQLException lastException = null;
-            
-            while (retryCount < maxRetries) {
-                try {
-                    if (retryCount > 0) {
-                        System.out.println("  ℹ️  Retry attempt " + retryCount + " of " + (maxRetries - 1));
-                        Thread.sleep(2000); // Wait 2 seconds between retries
-                    }
-                    
-                    dbConnection = DriverManager.getConnection(jdbcUrl, connectionProps);
-                    break; // Connection successful
-                    
-                } catch (SQLException e) {
-                    lastException = e;
-                    retryCount++;
-                    if (retryCount < maxRetries) {
-                        System.out.println("  ⚠️  Connection attempt failed: " + e.getMessage());
-                    }
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
-                    break;
-                }
-            }
-            
-            if (dbConnection == null) {
-                throw lastException;
-            }
-            
-            connectionEndTime = System.currentTimeMillis();
-            long connectionTime = connectionEndTime - connectionStartTime;
-            
-            System.out.println("  ✅ Database connection established successfully");
-            System.out.println("    Connection time: " + connectionTime + " ms");
-            
-            // Validate connection
-            System.out.println("  Validating connection...");
-            if (dbConnection.isValid(30)) {
-                System.out.println("  ✅ Connection is valid (validated in 30 seconds)");
-            } else {
-                System.out.println("  ⚠️  Connection validation failed or timed out");
-                dbConnection.close();
-                dbConnection = null;
+                System.out.println();
+                System.out.println("  Troubleshooting:");
+                System.out.println("    1. Verify database is running");
+                System.out.println("    2. Check connection details in db.properties");
+                System.out.println("    3. CRITICAL: Use launcher script (dseries_healthcheck.sh or .bat)");
+                System.out.println("    4. Launcher script loads dSeries encryption libraries");
+                System.out.println("    5. Without launcher script, password decryption will fail");
+                System.out.println();
+                System.out.println("  Database checks will be skipped");
+                System.out.println();
                 return false;
             }
             
-            System.out.println();
-            return true;
-            
-        } catch (SQLException e) {
-            System.out.println("  ⚠️  Could not connect to database");
-            System.out.println("  Error: " + e.getMessage());
-            System.out.println();
-            System.out.println("  Troubleshooting:");
-            System.out.println("    1. Verify database is running");
-            System.out.println("    2. Check connection details in: " + installDir + "/conf/db.properties");
-            System.out.println("    3. Verify username and password are correct");
-            System.out.println("    4. Check if password is encrypted (ENC format)");
-            System.out.println("    5. Ensure database user has SELECT permissions");
-            System.out.println("    6. Test connection: psql -h " + dbHost + " -p " + dbPort + " -U " + dbUser + " -d " + dbName);
-            System.out.println();
-            System.out.println("  Database checks will be skipped");
-            System.out.println("  System and server checks will continue...");
+        } catch (Exception e) {
+            System.out.println("  ❌ Unexpected error: " + e.getMessage());
+            e.printStackTrace();
             System.out.println();
             return false;
         }

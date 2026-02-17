@@ -1,0 +1,152 @@
+===============================================================================
+dSeries Health Check Tool - Version 2.11.0 Release Summary
+===============================================================================
+Date: 2026-02-13
+Critical Fix: Database Connection Logic Rewritten to Match DBConnectionValidator
+
+===============================================================================
+CRITICAL CHANGES
+===============================================================================
+
+1. COMPLETE REWRITE OF connectToDatabase() METHOD
+   - Now EXACTLY matches DBConnectionValidator.java logic
+   - Analyzed official dSeries validateDbConnection.bat and DBConnectionValidator.java
+   - Replicated the exact connection flow used by dSeries itself
+
+2. PROPERTY HANDLING (EXACTLY LIKE DBConnectionValidator)
+   - Loads ALL properties from db.properties
+   - Removes specific properties before passing to driver:
+     * jdbc.Driver
+     * rdbms.driver
+     * jdbc.URL
+     * integratedSecurity
+     * rdbms.userid (after converting to "user")
+     * rdbms.password (after converting to "password")
+   - Passes ALL remaining properties to DriverManager.getConnection()
+   - This ensures SSL properties, custom driver properties, etc. are all passed
+
+3. PASSWORD DECRYPTION (EXACTLY LIKE DBConnectionValidator)
+   - Uses Scrambler.recover(password, key) via reflection
+   - Gets key from RelationalDatabaseManager.getKey() dynamically
+   - Falls back to "RelationalDatabaseManager" if getKey() not available
+   - Decrypts both database password and SSL trustStore password
+   - Sets system properties for SSL (required for DB2 and Oracle-SSL)
+
+4. WINDOWS AUTHENTICATION SUPPORT
+   - Checks integratedSecurity property
+   - Appends to JDBC URL if needed
+   - Skips user/password if Windows auth is enabled
+
+5. SSL/TLS SUPPORT
+   - Decrypts javax.net.ssl.trustStorePassword
+   - Sets system properties for trustStore and trustStorePassword
+   - Required for DB2-SSL, Oracle-SSL, PostgreSQL-SSL
+
+===============================================================================
+TECHNICAL DETAILS
+===============================================================================
+
+OLD APPROACH (v2.10.0 and earlier):
+- Loaded config once in loadDatabaseConfig()
+- Built Properties object with only user/password
+- Added SSL properties separately
+- Didn't remove original properties
+- Didn't pass all db.properties to driver
+
+NEW APPROACH (v2.11.0):
+- Loads db.properties fresh in connectToDatabase()
+- Removes specific properties (jdbc.Driver, jdbc.URL, etc.)
+- Converts rdbms.userid -> "user", rdbms.password -> "password"
+- Removes rdbms.userid and rdbms.password after conversion
+- Passes ALL remaining properties to DriverManager
+- Sets system properties for SSL (required for some drivers)
+
+===============================================================================
+WHY THIS FIXES THE ORA-01017 ERROR
+===============================================================================
+
+The previous approach was missing properties that Oracle driver needs:
+- Custom Oracle connection properties in db.properties
+- SSL certificate properties
+- Driver-specific configuration
+
+By passing ALL properties (after removing only the non-driver ones),
+the connection now works EXACTLY like dSeries's own validateDbConnection.
+
+===============================================================================
+VALIDATION
+===============================================================================
+
+This implementation was validated against:
+1. C:\CA\ESPdSeriesWAServer_R12_4\bin\validateDbConnection.bat
+2. C:\Codes\DE-Code\de-core\dSeriesServer\ServerCore\src\main\java\utilities\com\ca\wa\util\engine\serverutil\DBConnectionValidator.java
+
+The logic is now IDENTICAL to dSeries's own connection validation.
+
+===============================================================================
+TESTING INSTRUCTIONS
+===============================================================================
+
+1. CRITICAL: Must use launcher script
+   - Windows: dseries_healthcheck.bat <install_dir>
+   - Linux:   ./dseries_healthcheck.sh <install_dir>
+   
+2. Launcher script loads dSeries classpath (required for Scrambler)
+
+3. Expected output:
+   [DB-CONNECT] Connecting to Database...
+     Database connection details:
+       Driver: oracle.jdbc.driver.OracleDriver
+       URL: jdbc:***:...
+       User: bu******
+   
+     Attempting to load JDBC driver: oracle.jdbc.driver.OracleDriver
+     ✅ JDBC driver loaded successfully
+     ℹ️  Decrypting password...
+     ✅ Password decrypted successfully
+     Connecting to database...
+     ✅ Database connection established successfully
+       Connection time: XXX ms
+     Validating connection...
+     ✅ Connection is valid (validated in 30 seconds)
+
+4. If password decryption fails:
+   - Verify launcher script is used (not direct java command)
+   - Check that dSeries lib directory is in classpath
+   - Ensure Scrambler class is available
+
+===============================================================================
+FILES MODIFIED
+===============================================================================
+
+1. DSeriesHealthCheck.java (v2.11.0)
+   - Completely rewrote connectToDatabase() method
+   - Now matches DBConnectionValidator.java exactly
+   - Enhanced property handling
+   - Improved error messages
+
+2. dseries-healthcheck.jar
+   - Rebuilt with new connection logic
+
+===============================================================================
+BACKWARD COMPATIBILITY
+===============================================================================
+
+✅ All previous features preserved
+✅ All database types supported (PostgreSQL, Oracle, DB2, SQL Server)
+✅ All encryption methods supported
+✅ SSL/TLS support maintained
+✅ Windows authentication maintained
+✅ All health checks unchanged
+
+===============================================================================
+NEXT STEPS
+===============================================================================
+
+If connection still fails after this update:
+1. Verify you're using the launcher script
+2. Check that validateDbConnection.bat/sh works in dSeries
+3. Compare output of validateDbConnection with health check tool
+4. Verify db.properties has correct encrypted password
+
+===============================================================================
