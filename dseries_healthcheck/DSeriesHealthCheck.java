@@ -1941,19 +1941,15 @@ public class DSeriesHealthCheck {
                 return result.toString();
             }
         } catch (ClassNotFoundException e) {
-            System.out.println("  ⚠️  dSeries encryption library not found in classpath");
-            System.out.println("  Note: Ensure dSeries libraries are in classpath (use launcher scripts)");
+            // Silently fail - encryption library not available (expected in some cases)
+            // User will see "Using plain text password" message later if needed
         } catch (NoSuchMethodException e) {
-            System.out.println("  ⚠️  Password decryption method not available");
+            // Silently fail - method not available
         } catch (java.lang.reflect.InvocationTargetException e) {
-            Throwable cause = e.getCause();
-            if (cause != null) {
-                System.out.println("  ⚠️  Password decryption failed: " + cause.getMessage());
-            } else {
-                System.out.println("  ⚠️  Password decryption failed: " + e.getMessage());
-            }
+            // Silently fail - decryption failed (could be wrong format, wrong key, etc.)
+            // This is expected when password is not encrypted with Scrambler
         } catch (Exception e) {
-            System.out.println("  ⚠️  Password decryption failed: " + e.getMessage());
+            // Silently fail - any other decryption error
         }
         
         return "";

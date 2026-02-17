@@ -111,9 +111,9 @@ REM Try to use dSeries native classpath.bat for complete classpath
 if exist "%DSERIES_HOME%\bin\classpath.bat" (
     echo   Using dSeries native classpath.bat...
     
-    REM Execute classpath.bat to set CLASSPATH
+    REM Execute classpath.bat to set CLASSPATH (suppress all output)
     pushd "%DSERIES_HOME%\bin"
-    call classpath.bat >nul 2>&1
+    call classpath.bat >nul 2>nul
     popd
     
     if defined CLASSPATH (

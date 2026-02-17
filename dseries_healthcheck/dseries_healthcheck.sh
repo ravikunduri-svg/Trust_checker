@@ -128,11 +128,11 @@ build_classpath() {
     if [ -f "${DSERIES_HOME}/bin/classpath.sh" ] || [ -f "${DSERIES_HOME}/bin/classpath" ]; then
         echo "  Using dSeries native classpath script..."
         
-        # Execute classpath script to set CLASSPATH
+        # Execute classpath script to set CLASSPATH (suppress all output)
         if [ -f "${DSERIES_HOME}/bin/classpath.sh" ]; then
-            . "${DSERIES_HOME}/bin/classpath.sh" >/dev/null 2>&1
+            . "${DSERIES_HOME}/bin/classpath.sh" >/dev/null 2>/dev/null
         elif [ -f "${DSERIES_HOME}/bin/classpath" ]; then
-            . "${DSERIES_HOME}/bin/classpath" >/dev/null 2>&1
+            . "${DSERIES_HOME}/bin/classpath" >/dev/null 2>/dev/null
         fi
         
         if [ -n "${CLASSPATH}" ]; then
