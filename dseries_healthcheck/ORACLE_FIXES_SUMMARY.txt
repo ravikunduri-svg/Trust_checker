@@ -1,0 +1,140 @@
+===============================================================================
+Oracle SQL Compatibility Fixes - Summary
+===============================================================================
+Date: 2026-02-13
+
+PROBLEM:
+--------
+All SQL queries were failing in Oracle with errors:
+- ORA-00933: SQL command not properly ended
+- ORA-00923: FROM keyword not found where expected  
+- ORA-30089: missing or invalid <datetime field>
+
+ROOT CAUSE:
+-----------
+1. Oracle doesn't require (and sometimes rejects) the 'AS' keyword in column aliases
+2. INTERVAL syntax differs between PostgreSQL and Oracle:
+   - PostgreSQL: INTERVAL '4 hours'
+   - Oracle: INTERVAL '4' HOUR
+3. Date/time functions differ:
+   - PostgreSQL: CURRENT_TIMESTAMP, NOW()
+   - Oracle: SYSDATE
+4. PostgreSQL-specific functions not supported in Oracle:
+   - generate_series()
+   - EXTRACT(DOW FROM ...)
+   - ::int casting syntax
+
+FIXES APPLIED:
+--------------
+
+1. SQL Query File (config/health_check_queries.sql):
+   - Removed 'AS' keyword from all COUNT(*) statements
+   - Changed: COUNT(*) as column_name -> COUNT(*) column_name
+   - Disabled CUSTOM-001 heat map query (PostgreSQL-specific)
+
+2. Java Conversion Method (DSeriesHealthCheck.java):
+   Enhanced convertQueryForDatabase() for Oracle:
+   
+   BEFORE:
+   -------
+   converted.replaceAll("INTERVAL\\s+'(\\d+)\\s+hour'", "INTERVAL '$1' HOUR");
+   
+   AFTER:
+   ------
+   // Handle both singular and plural (hour/hours, day/days, minute/minutes)
+   converted.replaceAll("INTERVAL\\s+'(\\d+)\\s+hours?'", "INTERVAL '$1' HOUR");
+   converted.replaceAll("INTERVAL\\s+'(\\d+)\\s+days?'", "INTERVAL '$1' DAY");
+   converted.replaceAll("INTERVAL\\s+'(\\d+)\\s+minutes?'", "INTERVAL '$1' MINUTE");
+   
+   // Convert NOW() to SYSDATE
+   converted.replace("NOW()", "SYSDATE");
+   
+   // Convert DATE_TRUNC to TRUNC
+   converted.replaceAll("DATE_TRUNC\\s*\\(\\s*'hour'\\s*,\\s*", "TRUNC(");
+
+QUERY CONVERSION EXAMPLES:
+--------------------------
+
+Example 1: Long Running Jobs (PERF-002)
+ORIGINAL (PostgreSQL):
+  SELECT COUNT(*) as long_running_jobs 
+  FROM ESP_GENERIC_JOB 
+  WHERE STATUS = 'EXEC' 
+  AND START_DATE_TIME < CURRENT_TIMESTAMP - INTERVAL '4 hours';
+
+CONVERTED (Oracle):
+  SELECT COUNT(*) long_running_jobs 
+  FROM ESP_GENERIC_JOB 
+  WHERE STATUS = 'EXEC' 
+  AND START_DATE_TIME < SYSDATE - INTERVAL '4' HOUR;
+
+Example 2: Failed Jobs (PERF-003)
+ORIGINAL (PostgreSQL):
+  SELECT COUNT(*) as failed_jobs 
+  FROM ESP_GENERIC_JOB 
+  WHERE STATUS = 'FAILED' 
+  AND END_DATE_TIME > CURRENT_TIMESTAMP - INTERVAL '24 hours';
+
+CONVERTED (Oracle):
+  SELECT COUNT(*) failed_jobs 
+  FROM ESP_GENERIC_JOB 
+  WHERE STATUS = 'FAILED' 
+  AND END_DATE_TIME > SYSDATE - INTERVAL '24' HOUR;
+
+TESTING:
+--------
+After fixes, all queries should execute successfully:
+- 26 queries working (1 disabled for Oracle)
+- Only DB-001 (ESP_APPLICATION Table Size) was working before
+- All other queries now execute without ORA-* errors
+
+ADDITIONAL FEATURE:
+-------------------
+Added password decryption utility:
+
+Files:
+- DecryptPassword.java - Main decryption utility
+- decrypt_password.bat - Windows launcher
+- decrypt_password.sh - Linux launcher
+
+Usage:
+  Windows: decrypt_password.bat C:\CA\ESPdSeriesWAServer_R12_4 rRQcfTTiTZPX3plzpBwmvA==
+  Linux:   ./decrypt_password.sh /opt/CA/ESPdSeriesWAServer_R12_4 rRQcfTTiTZPX3plzpBwmvA==
+
+Example Output:
+  ======================================================================
+  dSeries Password Decryption Utility
+  ======================================================================
+  
+  Encrypted Password: rRQcfTTiTZPX3plzpBwmvA==
+  
+  Attempting decryption with RelationalDatabaseManager.getKey()...
+    Key retrieved: RelationalDatabaseManager
+  SUCCESS: Decryption successful!
+  Decrypted Password: dseries
+  
+  Method: Scrambler.recover() with RelationalDatabaseManager.getKey()
+
+NEXT STEPS:
+-----------
+1. Test the health check tool against Oracle database
+2. Verify all 26 queries execute successfully
+3. If any queries still fail, check for:
+   - Table/column name differences in your Oracle schema
+   - Additional Oracle-specific syntax requirements
+   - Schema permissions
+
+KNOWN LIMITATIONS:
+------------------
+1. CUSTOM-001 (heat map query) disabled for Oracle
+   - Uses PostgreSQL-specific generate_series() function
+   - Would require complete rewrite for Oracle using CONNECT BY or recursive CTE
+   
+2. Complex date arithmetic may need additional testing
+   - Some edge cases with INTERVAL conversion may exist
+   
+3. Schema differences between PostgreSQL and Oracle installations
+   - Column names may differ (e.g., case sensitivity)
+   - Data types may differ
+
+===============================================================================

@@ -1,0 +1,319 @@
+===============================================================================
+dSeries Log Analysis Summary - Developer Report
+===============================================================================
+Analysis Date: 2026-02-17
+Log Period: 2026-02-12 06:55 - 14:17
+Environment: WLA_NONPROD1
+Product Version: 25.0.00
+Total Error Lines: 17,610
+
+===============================================================================
+CRITICAL FINDINGS
+===============================================================================
+
+1. DATABASE CONNECTION POOL DEADLOCK (P0 - CRITICAL)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Blocked Threads: 3,838
+   Lock Object: DBConnectionPool @ 0x00007efd52bf7910
+   Lock Holders: 3 threads (stuck in DriverManager.getConnection)
+   Duration: ~56 minutes (13:20 - 14:16)
+   Impact: COMPLETE SYSTEM PARALYSIS
+   
+   Root Cause:
+   └─ synchronized getConnection() holds lock during TCP socket I/O
+      └─ SQL Server connection hangs (network/AlwaysOn issue)
+         └─ All threads blocked waiting for lock
+            └─ System becomes unresponsive
+   
+   Quick Fix:
+   ✓ Add to jdbc.URL: ;loginTimeout=15;socketTimeout=30000;connectRetryCount=0
+   ✓ Reduce pool max from 100 to 50
+   ✓ Restart server
+   
+   Code Fix Required:
+   ✓ Move connection creation outside synchronized block
+   ✓ Implement timeout at application level
+   ✓ Add circuit breaker pattern
+
+2. AGENT ENCRYPTION KEY MISSING (P0 - CRITICAL)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Agent: CPCWVIGPUTLU01
+   Error: CryptoException: Key not available for node
+   Frequency: 162 occurrences (every ~2 minutes)
+   Duration: Entire log period
+   Impact: AGENT CANNOT COMMUNICATE
+   
+   Root Cause:
+   └─ Agent not properly registered in server's key store
+      └─ Missing or expired encryption key
+         └─ Agent communication fails
+            └─ Jobs cannot execute on this agent
+   
+   Quick Fix:
+   ✓ Re-register agent: ./cybAgent -r <server> -p 7599
+   ✓ Restart agent: ./cybAgent stop && ./cybAgent start
+   
+   Verification:
+   ✓ Check: grep "CPCWVIGPUTLU01" errors.txt (should be empty)
+
+3. TDR UPDATE FAILURES (P1 - WARNING)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Table: ESP_TDR_DATA
+   Error: DatabaseUpdateException: table key is null
+   Frequency: 3 occurrences
+   Impact: TIME-DEPENDENT JOBS MAY NOT FIRE
+   
+   Root Cause:
+   └─ UPDATE without WHERE clause on primary key
+      └─ Orphaned TDR records with null keys
+         └─ Update fails
+   
+   Quick Fix:
+   ✓ Clean up: DELETE FROM ESP_TDR_DATA WHERE TDR_ID IS NULL
+   ✓ Reset stuck: UPDATE ESP_TDR_DATA SET FIRING='N' WHERE FIRING='P'
+
+4. UNKNOWN RMI MESSAGE TYPE (P2 - LOW)
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   Message: "Server retry" is unknown
+   Frequency: 7 occurrences
+   Impact: MINOR - May indicate version mismatch
+   
+   Quick Fix:
+   ✓ Set rmi.message.validation=lenient in rmi.properties
+   ✓ Verify all components are same version
+
+===============================================================================
+ERROR STATISTICS
+===============================================================================
+
+Total Errors: 17,610 lines
+Breakdown:
+  • Crypto Key Errors:     162 (0.9%)  - Agent CPCWVIGPUTLU01
+  • TDR Update Errors:       3 (0.02%) - ESP_TDR_DATA
+  • RMI Message Errors:      7 (0.04%) - Unknown message type
+  • Other Errors:      17,438 (99%)   - Various (need deeper analysis)
+
+Error Rate:
+  • Peak: 13:24 - 14:16 (52 minutes)
+  • Average: ~339 errors/minute during peak
+  • Pattern: Repeating errors (same issue multiple times)
+
+===============================================================================
+TIMELINE OF EVENTS
+===============================================================================
+
+2026-02-05 22:44:08 - SQL Server AlwaysOn failover (Error 983)
+                    - Database replica not in PRIMARY/SECONDARY role
+                    - Server auto-restart triggered
+                    
+2026-02-05 22:44:15 - Successfully reconnected to database
+                    - Normal operation resumed
+                    
+2026-02-12 06:07:07 - Server shutdown (planned)
+
+2026-02-12 08:24:04 - Server restart
+
+2026-02-12 08:42:27 - Server restart
+                    - RMI components ready: 08:42:27
+                    - Application Manager ready: 08:46:19 (3m 52s - SLOW)
+                    
+2026-02-12 08:47:57 - First thread dump captured
+                    - 1,355 threads (already elevated)
+                    
+2026-02-12 13:20:15 - Server restart
+                    - Application Manager ready: 13:24:18 (4m 3s - VERY SLOW)
+                    
+2026-02-12 13:24:29 - First errors appear
+                    - TDR update failure
+                    - Agent crypto errors begin
+                    
+2026-02-12 13:20:15 - Thread accumulation begins
+         to         - Database connection attempts hanging
+         14:16:58   - 3,838 threads blocked on DBConnectionPool
+                    
+2026-02-12 14:16:58 - Server shutdown (forced due to hang)
+
+===============================================================================
+COMPONENT STARTUP PERFORMANCE
+===============================================================================
+
+Component                  | Normal Time | Observed Time | Status
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+RMI Components            | < 10s       | 10-15s        | OK
+Variable Manager          | < 20s       | 8-13s         | GOOD
+Resource Manager          | < 60s       | 47-55s        | OK
+Scheduler                 | < 30s       | 13-16s        | GOOD
+Application Manager       | < 120s      | 232-238s      | ⚠️ SLOW
+Workstation Component     | < 10s       | 1-5s          | GOOD
+Rest Component            | < 10s       | 6s            | GOOD
+
+⚠️ Application Manager taking 4+ minutes to start (normal: < 2 minutes)
+   Indicates: Large number of applications or database performance issues
+
+===============================================================================
+IMMEDIATE ACTION ITEMS (DO TODAY)
+===============================================================================
+
+Priority 0 (Critical - Do Now):
+  [1] Add JDBC connection timeouts to db.properties
+      └─ Edit: /opt/cawade/wlade/conf/db.properties
+      └─ Add: ;loginTimeout=15;socketTimeout=30000;connectRetryCount=0
+      └─ Time: 2 minutes
+      
+  [2] Re-register agent CPCWVIGPUTLU01
+      └─ On agent: ./cybAgent -r <server> -p 7599
+      └─ Time: 5 minutes
+      
+  [3] Clean up TDR orphaned records
+      └─ SQL: DELETE FROM ESP_TDR_DATA WHERE TDR_ID IS NULL
+      └─ Time: 2 minutes
+      
+  [4] Restart dSeries server
+      └─ Command: stopServer && sleep 10 && startServer
+      └─ Time: 5 minutes
+      
+  [5] Monitor for 1 hour
+      └─ Watch: thread count, errors.txt, agent communication
+      └─ Time: 60 minutes
+
+Priority 1 (Important - Do This Week):
+  [6] Tune connection pool settings
+  [7] Implement thread monitoring script
+  [8] Set up JMX monitoring
+  [9] Review Application Manager startup time
+  [10] Verify SQL Server AlwaysOn configuration
+
+===============================================================================
+CODE CHANGES REQUIRED (FOR DEVELOPMENT TEAM)
+===============================================================================
+
+1. DBConnectionPool.java
+   Location: com.ca.wa.core.engine.rdbms.DBConnectionPool
+   Method: getConnection()
+   Issue: Holds synchronized lock during connection creation
+   Fix: Move connection creation outside synchronized block
+   Effort: 2-3 days (including testing)
+   Risk: Medium (core component)
+
+2. TdrMapper.java
+   Location: com.ca.wa.comp.schedulerserver.tdr.TdrMapper
+   Method: resetInprogressTDRs()
+   Issue: UPDATE without proper WHERE clause
+   Fix: Add null checks and use parameterized queries
+   Effort: 1 day
+   Risk: Low
+
+3. RMIMessageHandler.java
+   Location: com.ca.wa.comp.library.communications.RMIMessageHandler
+   Method: handleMessage()
+   Issue: Throws exception on unknown message types
+   Fix: Add lenient mode to log and ignore
+   Effort: 0.5 days
+   Risk: Low
+
+===============================================================================
+TESTING PLAN
+===============================================================================
+
+Test 1: Connection Timeout Validation
+  1. Block SQL Server port: iptables -A OUTPUT -p tcp --dport 21820 -j DROP
+  2. Start dSeries
+  3. Verify: Connection attempts timeout within 15 seconds
+  4. Verify: System doesn't hang
+  5. Restore: iptables -D OUTPUT -p tcp --dport 21820 -j DROP
+  
+Test 2: Agent Communication
+  1. Re-register agent
+  2. Monitor errors.txt for 30 minutes
+  3. Verify: No crypto errors for CPCWVIGPUTLU01
+  4. Verify: Agent shows in UI as connected
+  
+Test 3: TDR Processing
+  1. Clean up orphaned TDRs
+  2. Create test TDR
+  3. Verify: TDR fires at scheduled time
+  4. Verify: No update errors in logs
+
+===============================================================================
+METRICS TO TRACK
+===============================================================================
+
+Before Fix:
+  • Thread Count: 8,000+ (CRITICAL)
+  • BLOCKED Threads: 3,838 (CRITICAL)
+  • Crypto Errors: 162 (HIGH)
+  • TDR Errors: 3 (LOW)
+  • System Status: UNRESPONSIVE
+
+After Fix (Target):
+  • Thread Count: < 1,500 (HEALTHY)
+  • BLOCKED Threads: < 10 (HEALTHY)
+  • Crypto Errors: 0 (RESOLVED)
+  • TDR Errors: 0 (RESOLVED)
+  • System Status: RESPONSIVE
+
+===============================================================================
+DOCUMENTATION CREATED
+===============================================================================
+
+1. DEVELOPER_LOG_ANALYSIS_REPORT.md
+   - Comprehensive technical analysis
+   - Detailed root cause for each issue
+   - Code-level fixes with examples
+   - 400+ lines of detailed documentation
+
+2. QUICK_FIX_GUIDE.md
+   - Emergency runbook
+   - Quick commands for each issue
+   - Configuration examples
+   - Monitoring scripts
+
+3. THREAD_DUMP_ANALYSIS_REPORT.md
+   - Thread dump deep dive
+   - Lock contention analysis
+   - Performance recommendations
+
+4. ORACLE_COMPATIBILITY_GUIDE.md
+   - Oracle SQL syntax fixes
+   - Query conversion examples
+   - Troubleshooting guide
+
+===============================================================================
+NEXT STEPS
+===============================================================================
+
+Immediate (Today):
+  1. Apply JDBC timeout configuration
+  2. Re-register agent CPCWVIGPUTLU01
+  3. Clean up TDR orphaned records
+  4. Restart server and monitor
+
+This Week:
+  5. Implement thread monitoring
+  6. Set up JMX monitoring
+  7. Tune connection pool
+  8. Create automated health checks
+
+This Month:
+  9. Deploy DBConnectionPool code fix
+  10. Implement circuit breaker pattern
+  11. Add REST health check endpoints
+  12. Upgrade to latest patch version
+
+===============================================================================
+CONTACT INFORMATION
+===============================================================================
+
+For Implementation:
+  • Database Issues: DBA Team
+  • Code Changes: Core Development Team
+  • Agent Issues: Agent Team
+  • Monitoring: Operations Team
+
+For Escalation:
+  • Level 1: Operations (restart, basic checks)
+  • Level 2: DBA (SQL Server, connections)
+  • Level 3: Development (code changes)
+  • Level 4: Broadcom Support (product defects)
+
+===============================================================================
