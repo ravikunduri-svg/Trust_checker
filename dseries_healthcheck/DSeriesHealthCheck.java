@@ -1216,6 +1216,12 @@ public class DSeriesHealthCheck {
             // Convert query for target database type
             String convertedQuery = convertQueryForDatabase(check.query, dbType);
             
+            // Remove trailing semicolon (Oracle JDBC doesn't like it)
+            convertedQuery = convertedQuery.trim();
+            if (convertedQuery.endsWith(";")) {
+                convertedQuery = convertedQuery.substring(0, convertedQuery.length() - 1).trim();
+            }
+            
             rs = stmt.executeQuery(convertedQuery);
             
             queryEndTime = System.currentTimeMillis();

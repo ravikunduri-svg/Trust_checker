@@ -52,7 +52,7 @@
 -- @THRESHOLD_OPERATOR: <
 -- @THRESHOLD_VALUE: 1000000
 -- @REMEDIATION: Run housekeeping if table exceeds threshold
-SELECT COUNT(*) record_count FROM ESP_APPLICATION;
+SELECT COUNT(*) AS record_count FROM ESP_APPLICATION;
 
 -- @CHECK_ID: DB-002
 -- @CHECK_NAME: ESP_GENERIC_JOB Table Size
@@ -62,7 +62,7 @@ SELECT COUNT(*) record_count FROM ESP_APPLICATION;
 -- @THRESHOLD_OPERATOR: <
 -- @THRESHOLD_VALUE: 5000000
 -- @REMEDIATION: Run housekeeping if table exceeds threshold
-SELECT COUNT(*) record_count FROM ESP_GENERIC_JOB;
+SELECT COUNT(*) AS record_count FROM ESP_GENERIC_JOB;
 
 -- @CHECK_ID: DB-003
 -- @CHECK_NAME: ESP_WSS_APPL Table Size
@@ -72,7 +72,7 @@ SELECT COUNT(*) record_count FROM ESP_GENERIC_JOB;
 -- @THRESHOLD_OPERATOR: <
 -- @THRESHOLD_VALUE: 100000
 -- @REMEDIATION: Run housekeeping to clean up old workstation data
-SELECT COUNT(*) record_count FROM ESP_WSS_APPL;
+SELECT COUNT(*) AS record_count FROM ESP_WSS_APPL;
 
 -- @CHECK_ID: DB-004
 -- @CHECK_NAME: ESP_WSS_JOB Table Size
@@ -82,7 +82,7 @@ SELECT COUNT(*) record_count FROM ESP_WSS_APPL;
 -- @THRESHOLD_OPERATOR: <
 -- @THRESHOLD_VALUE: 500000
 -- @REMEDIATION: Run housekeeping to clean up old workstation job data
-SELECT COUNT(*) record_count FROM ESP_WSS_JOB;
+SELECT COUNT(*) AS record_count FROM ESP_WSS_JOB;
 
 -- @CHECK_ID: DB-005
 -- @CHECK_NAME: ESP_RTWOB Table Size
@@ -92,7 +92,7 @@ SELECT COUNT(*) record_count FROM ESP_WSS_JOB;
 -- @THRESHOLD_OPERATOR: <
 -- @THRESHOLD_VALUE: 1000000
 -- @REMEDIATION: Run housekeeping to clean up old runtime data
-SELECT COUNT(*) record_count FROM ESP_RTWOB;
+SELECT COUNT(*) AS record_count FROM ESP_RTWOB;
 
 -- ============================================================================
 -- SECTION 2: DATA INTEGRITY CHECKS
@@ -106,7 +106,7 @@ SELECT COUNT(*) record_count FROM ESP_RTWOB;
 -- @THRESHOLD_OPERATOR: =
 -- @THRESHOLD_VALUE: 0
 -- @REMEDIATION: Run housekeeping or manually clean orphaned records
-SELECT COUNT(*) orphaned_jobs 
+SELECT COUNT(*) AS orphaned_jobs 
 FROM ESP_WSS_JOB 
 WHERE APPL_ID IN (
     SELECT APPL_ID 
@@ -127,7 +127,7 @@ WHERE APPL_ID IN (
 -- @THRESHOLD_OPERATOR: =
 -- @THRESHOLD_VALUE: 0
 -- @REMEDIATION: Run housekeeping or manually clean orphaned records
-SELECT COUNT(*) orphaned_applications 
+SELECT COUNT(*) AS orphaned_applications 
 FROM ESP_WSS_APPL 
 WHERE NOT EXISTS (
     SELECT 1 
@@ -144,7 +144,7 @@ WHERE NOT EXISTS (
 -- @THRESHOLD_OPERATOR: =
 -- @THRESHOLD_VALUE: 0
 -- @REMEDIATION: Run housekeeping or manually clean orphaned runtime data
-SELECT COUNT(*) orphaned_rtwob 
+SELECT COUNT(*) AS orphaned_rtwob 
 FROM ESP_RTWOB 
 WHERE NOT EXISTS (
     SELECT 1 
@@ -165,7 +165,7 @@ WHERE NOT EXISTS (
 -- @THRESHOLD_OPERATOR: >
 -- @THRESHOLD_VALUE: 0
 -- @REMEDIATION: Ensure agents are properly registered
-SELECT COUNT(*) total_agents FROM ESP_AGENT_RP;
+SELECT COUNT(*) AS total_agents FROM ESP_AGENT_RP;
 
 -- @CHECK_ID: AGENT-002
 -- @CHECK_NAME: Agents with Pending Actions
@@ -175,7 +175,7 @@ SELECT COUNT(*) total_agents FROM ESP_AGENT_RP;
 -- @THRESHOLD_OPERATOR: =
 -- @THRESHOLD_VALUE: 0
 -- @REMEDIATION: Review pending agent actions and complete them
-SELECT COUNT(*) pending_actions 
+SELECT COUNT(*) AS pending_actions 
 FROM ESP_AGENT_RP 
 WHERE ACTIONSTATUS = 1;
 
@@ -187,7 +187,7 @@ WHERE ACTIONSTATUS = 1;
 -- @THRESHOLD_OPERATOR: =
 -- @THRESHOLD_VALUE: 0
 -- @REMEDIATION: Review agent action logs and resolve failures
-SELECT COUNT(*) failed_actions 
+SELECT COUNT(*) AS failed_actions 
 FROM ESP_AGENT_RP 
 WHERE ACTIONSTATUS = 2;
 
@@ -203,7 +203,7 @@ WHERE ACTIONSTATUS = 2;
 -- @THRESHOLD_OPERATOR: >=
 -- @THRESHOLD_VALUE: 0
 -- @REMEDIATION: Review event definitions
-SELECT COUNT(*) total_events 
+SELECT COUNT(*) AS total_events 
 FROM ESP_EVENT_RP;
 
 -- @CHECK_ID: EVENT-002
@@ -214,7 +214,7 @@ FROM ESP_EVENT_RP;
 -- @THRESHOLD_OPERATOR: <
 -- @THRESHOLD_VALUE: 10
 -- @REMEDIATION: Review and release held events
-SELECT COUNT(*) held_events 
+SELECT COUNT(*) AS held_events 
 FROM ESP_EVENT_RP 
 WHERE HOLD_COUNT > 0;
 
@@ -230,7 +230,7 @@ WHERE HOLD_COUNT > 0;
 -- @THRESHOLD_OPERATOR: >=
 -- @THRESHOLD_VALUE: 0
 -- @REMEDIATION: Review HA configuration if needed
-SELECT COUNT(*) ha_config_count 
+SELECT COUNT(*) AS ha_config_count 
 FROM ESP_CONFIG_GROUP 
 WHERE TYPE = 'CONFIG_INSTANCE';
 
@@ -242,7 +242,7 @@ WHERE TYPE = 'CONFIG_INSTANCE';
 -- @THRESHOLD_OPERATOR: >=
 -- @THRESHOLD_VALUE: 0
 -- @REMEDIATION: Ensure all HA nodes are properly configured
-SELECT COUNT(*) ha_nodes 
+SELECT COUNT(*) AS ha_nodes 
 FROM ESP_STAGE2HAC;
 
 -- ============================================================================
@@ -267,7 +267,7 @@ SELECT COUNT(DISTINCT appl_gen_no) active_generations FROM ESP_APPLICATION;
 -- @THRESHOLD_OPERATOR: <
 -- @THRESHOLD_VALUE: 10
 -- @REMEDIATION: Investigate and optimize long-running jobs
-SELECT COUNT(*) long_running_jobs 
+SELECT COUNT(*) AS long_running_jobs 
 FROM ESP_GENERIC_JOB 
 WHERE STATUS = 'EXEC' 
 AND START_DATE_TIME < CURRENT_TIMESTAMP - INTERVAL '4 hours';
@@ -280,7 +280,7 @@ AND START_DATE_TIME < CURRENT_TIMESTAMP - INTERVAL '4 hours';
 -- @THRESHOLD_OPERATOR: <
 -- @THRESHOLD_VALUE: 50
 -- @REMEDIATION: Investigate job failures and fix root causes
-SELECT COUNT(*) failed_jobs 
+SELECT COUNT(*) AS failed_jobs 
 FROM ESP_GENERIC_JOB 
 WHERE STATUS = 'FAILED' 
 AND END_DATE_TIME > CURRENT_TIMESTAMP - INTERVAL '24 hours';
@@ -293,7 +293,7 @@ AND END_DATE_TIME > CURRENT_TIMESTAMP - INTERVAL '24 hours';
 -- @THRESHOLD_OPERATOR: <
 -- @THRESHOLD_VALUE: 1000
 -- @REMEDIATION: Monitor for job bottlenecks
-SELECT COUNT(*) executing_jobs 
+SELECT COUNT(*) AS executing_jobs 
 FROM ESP_GENERIC_JOB 
 WHERE STATUS = 'EXEC';
 
@@ -305,7 +305,7 @@ WHERE STATUS = 'EXEC';
 -- @THRESHOLD_OPERATOR: <
 -- @THRESHOLD_VALUE: 500
 -- @REMEDIATION: Check agent availability and resource constraints
-SELECT COUNT(*) waiting_jobs 
+SELECT COUNT(*) AS waiting_jobs 
 FROM ESP_GENERIC_JOB 
 WHERE STATUS = 'WAITING';
 
@@ -321,7 +321,7 @@ WHERE STATUS = 'WAITING';
 -- @THRESHOLD_OPERATOR: >=
 -- @THRESHOLD_VALUE: 0
 -- @REMEDIATION: Review alert definitions
-SELECT COUNT(*) total_alerts 
+SELECT COUNT(*) AS total_alerts 
 FROM ESP_ALERT_RP;
 
 -- @CHECK_ID: CONN-001
@@ -332,7 +332,7 @@ FROM ESP_ALERT_RP;
 -- @THRESHOLD_OPERATOR: >=
 -- @THRESHOLD_VALUE: 0
 -- @REMEDIATION: Review connection profile definitions
-SELECT COUNT(*) total_conn_profiles 
+SELECT COUNT(*) AS total_conn_profiles 
 FROM ESP_CONN_PROFILE_RP;
 
 -- ============================================================================
@@ -347,7 +347,7 @@ FROM ESP_CONN_PROFILE_RP;
 -- @THRESHOLD_OPERATOR: >=
 -- @THRESHOLD_VALUE: 0
 -- @REMEDIATION: Review resource definitions
-SELECT COUNT(*) total_resources FROM ESP_RESOURCE_RP;
+SELECT COUNT(*) AS total_resources FROM ESP_RESOURCE_RP;
 
 -- @CHECK_ID: RM-002
 -- @CHECK_NAME: Resources with Low Availability
@@ -357,7 +357,7 @@ SELECT COUNT(*) total_resources FROM ESP_RESOURCE_RP;
 -- @THRESHOLD_OPERATOR: =
 -- @THRESHOLD_VALUE: 0
 -- @REMEDIATION: Review and increase resource availability
-SELECT COUNT(*) low_availability_resources 
+SELECT COUNT(*) AS low_availability_resources 
 FROM ESP_RESOURCE_RP 
 WHERE MAX_AVAILABILITY > 0 
 AND (AVAILABILITY * 100 / MAX_AVAILABILITY) < 10;
@@ -374,7 +374,7 @@ AND (AVAILABILITY * 100 / MAX_AVAILABILITY) < 10;
 -- @THRESHOLD_OPERATOR: >
 -- @THRESHOLD_VALUE: 0
 -- @REMEDIATION: Review user accounts
-SELECT COUNT(*) total_users FROM ESP_USER;
+SELECT COUNT(*) AS total_users FROM ESP_USER;
 
 -- @CHECK_ID: SEC-002
 -- @CHECK_NAME: User Groups
@@ -384,7 +384,7 @@ SELECT COUNT(*) total_users FROM ESP_USER;
 -- @THRESHOLD_OPERATOR: >=
 -- @THRESHOLD_VALUE: 0
 -- @REMEDIATION: Review user group definitions
-SELECT COUNT(*) total_usergroups 
+SELECT COUNT(*) AS total_usergroups 
 FROM ESP_USERGROUP;
 
 -- ============================================================================
@@ -403,7 +403,7 @@ FROM ESP_USERGROUP;
 -- NOTE: This query uses PostgreSQL-specific functions (generate_series, EXTRACT DOW, ::int casting)
 -- For Oracle, this query needs to be rewritten using Oracle-specific syntax
 -- Commented out for Oracle compatibility
--- SELECT COUNT(*) custom_metric FROM YOUR_TABLE WHERE YOUR_CONDITION;
+-- SELECT COUNT(*) AS custom_metric FROM YOUR_TABLE WHERE YOUR_CONDITION;
 -- ============================================================================
 -- END OF CONFIGURATION
 -- ============================================================================
@@ -418,3 +418,4 @@ FROM ESP_USERGROUP;
 -- For more information, see:
 -- https://techdocs.broadcom.com/us/en/ca-enterprise-software/intelligent-automation/ca-workload-automation-de/12-3/maintaining.html
 -- ============================================================================
+
