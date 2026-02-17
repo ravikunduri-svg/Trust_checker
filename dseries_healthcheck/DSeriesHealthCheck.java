@@ -1751,8 +1751,14 @@ public class DSeriesHealthCheck {
         else if (dbType.contains("oracle")) {
             // Date/Time functions
             converted = converted.replace("CURRENT_TIMESTAMP", "SYSDATE");
-            converted = converted.replaceAll("INTERVAL\\s+'(\\d+)\\s+hour'", "INTERVAL '$1' HOUR");
-            converted = converted.replaceAll("INTERVAL\\s+'(\\d+)\\s+day'", "INTERVAL '$1' DAY");
+            // Handle INTERVAL with subtraction: CURRENT_TIMESTAMP - INTERVAL '4 hours' -> SYSDATE - INTERVAL '4' HOUR
+            converted = converted.replaceAll("INTERVAL\\s+'(\\d+)\\s+hours?'", "INTERVAL '$1' HOUR");
+            converted = converted.replaceAll("INTERVAL\\s+'(\\d+)\\s+days?'", "INTERVAL '$1' DAY");
+            converted = converted.replaceAll("INTERVAL\\s+'(\\d+)\\s+minutes?'", "INTERVAL '$1' MINUTE");
+            // Handle NOW() function
+            converted = converted.replace("NOW()", "SYSDATE");
+            // Handle DATE_TRUNC (not directly supported in Oracle, needs TRUNC)
+            converted = converted.replaceAll("DATE_TRUNC\\s*\\(\\s*'hour'\\s*,\\s*", "TRUNC(");
         }
         
         // DB2 specific conversions
