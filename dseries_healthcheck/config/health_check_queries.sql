@@ -397,13 +397,13 @@ FROM ESP_USERGROUP;
 -- @CHECK_CATEGORY: Custom
 -- @SEVERITY: INFO
 -- @DESCRIPTION: dseries heat map based on the schedules (PostgreSQL only - disabled for Oracle)
--- @THRESHOLD_OPERATOR: >
+-- @THRESHOLD_OPERATOR: INFO_ONLY
 -- @THRESHOLD_VALUE: 0
--- @REMEDIATION: What to do if check fails
+-- @REMEDIATION: This query is disabled for Oracle. Use PostgreSQL for heat map functionality.
 -- NOTE: This query uses PostgreSQL-specific functions (generate_series, EXTRACT DOW, ::int casting)
 -- For Oracle, this query needs to be rewritten using Oracle-specific syntax
--- Commented out for Oracle compatibility
--- SELECT COUNT(*) AS custom_metric FROM YOUR_TABLE WHERE YOUR_CONDITION;
+-- Placeholder query for Oracle compatibility (always returns 0)
+SELECT 0 AS disabled_query FROM DUAL;
 -- ============================================================================
 -- END OF CONFIGURATION
 -- ============================================================================
