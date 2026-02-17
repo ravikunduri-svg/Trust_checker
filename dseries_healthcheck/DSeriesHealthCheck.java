@@ -15,8 +15,15 @@ import java.security.GeneralSecurityException;
  * Performs technical reviews including architecture, security, database,
  * agents, clients, high availability, and performance checks.
  * 
- * Version: 2.8.0
+ * Version: 2.9.0
  * Date: 2026-02-13
+ * 
+ * Version 2.9.0 Enhancements:
+ * - Fixed Oracle JDBC URL handling (now uses original URL from db.properties)
+ * - Fixed ORA-17866 error (invalid port number format)
+ * - Fixed JVM config file detection (now checks startServer on Unix)
+ * - Classpath scripts correctly identified (classpath.sh on Unix, classpath.bat on Windows)
+ * - Enhanced Oracle URL parsing to support //[host]:port/service format
  * 
  * Version 2.8.0 Enhancements:
  * - Fixed Oracle JDBC driver detection (was incorrectly using PostgreSQL driver)
@@ -97,6 +104,7 @@ public class DSeriesHealthCheck {
     private static String dbPassword = "";
     private static String dbDriver = "org.postgresql.Driver";
     private static String dbType = "";
+    private static String originalJdbcUrl = null;  // Store original URL from db.properties
     private static Connection dbConnection = null;
     
     // SSL/TLS properties
@@ -445,10 +453,13 @@ public class DSeriesHealthCheck {
                 propsFile = new File(installDir, "conf/server.properties");
             }
             if (!propsFile.exists()) {
-                propsFile = new File(installDir, "bin/espserver");  // Linux startup script
+                propsFile = new File(installDir, "bin/startServer");  // Linux/Unix startup script
             }
             if (!propsFile.exists()) {
-                propsFile = new File(installDir, "bin/espserver.sh");  // Linux startup script
+                propsFile = new File(installDir, "bin/espserver");  // Alternative Linux startup script
+            }
+            if (!propsFile.exists()) {
+                propsFile = new File(installDir, "bin/espserver.sh");  // Alternative Linux startup script
             }
             
             if (!propsFile.exists()) {
@@ -690,6 +701,7 @@ public class DSeriesHealthCheck {
             props.load(new FileInputStream(configFile));
             
             String jdbcUrl = props.getProperty("jdbc.URL", "");
+            originalJdbcUrl = jdbcUrl;  // Store original URL for later use
             dbUser = props.getProperty("rdbms.userid", dbUser);
             
             // Get and decrypt password
@@ -744,8 +756,19 @@ public class DSeriesHealthCheck {
                 }
             } else if (jdbcUrl.contains("oracle")) {
                 // Oracle: jdbc:oracle:thin:@host:port:sid or jdbc:oracle:thin:@host:port/service
-                Pattern pattern = Pattern.compile("jdbc:oracle:thin:@([^:]+):(\\d+)[:/](.+)");
-                Matcher matcher = pattern.matcher(jdbcUrl);
+                // Also supports: jdbc:oracle:thin:@//host:port/service
+                Pattern pattern1 = Pattern.compile("jdbc:oracle:thin:@//\\[?([^\\]:]+)\\]?:(\\d+)/(.+)");
+                Pattern pattern2 = Pattern.compile("jdbc:oracle:thin:@//([^:]+):(\\d+)/(.+)");
+                Pattern pattern3 = Pattern.compile("jdbc:oracle:thin:@([^:]+):(\\d+)[:/](.+)");
+                
+                Matcher matcher = pattern1.matcher(jdbcUrl);
+                if (!matcher.find()) {
+                    matcher = pattern2.matcher(jdbcUrl);
+                }
+                if (!matcher.find()) {
+                    matcher = pattern3.matcher(jdbcUrl);
+                }
+                
                 if (matcher.find()) {
                     dbHost = matcher.group(1);
                     dbPort = Integer.parseInt(matcher.group(2));
@@ -901,32 +924,28 @@ public class DSeriesHealthCheck {
                 return false;
             }
             
-            // Build JDBC URL based on driver type
+            // Use original JDBC URL from db.properties if available
+            // This preserves complex Oracle URLs like jdbc:oracle:thin:@//[host]:port/service
             String jdbcUrl;
-            if (dbDriver.contains("postgresql")) {
-                jdbcUrl = "jdbc:postgresql://" + dbHost + ":" + dbPort + "/" + dbName;
-            } else if (dbDriver.contains("oracle")) {
-                jdbcUrl = "jdbc:oracle:thin:@" + dbHost + ":" + dbPort + ":" + dbName;
-            } else if (dbDriver.contains("sqlserver")) {
-                jdbcUrl = "jdbc:sqlserver://" + dbHost + ":" + dbPort + ";databaseName=" + dbName;
-                // Windows authentication support
-                if (dbUser.isEmpty() || dbPassword.isEmpty()) {
-                    jdbcUrl += ";integratedSecurity=true";
-                    System.out.println("  ℹ️  Using Windows authentication (integratedSecurity=true)");
-                }
-            } else if (dbDriver.contains("db2")) {
-                jdbcUrl = "jdbc:db2://" + dbHost + ":" + dbPort + "/" + dbName;
+            if (originalJdbcUrl != null && !originalJdbcUrl.isEmpty()) {
+                jdbcUrl = originalJdbcUrl;
+                System.out.println("  ℹ️  Using JDBC URL from db.properties");
             } else {
-                // Try to use the original JDBC URL from db.properties
-                try {
-                    File configFile = useExternalDbConfig && externalDbConfigFile != null 
-                        ? new File(externalDbConfigFile) 
-                        : new File(installDir, "conf/db.properties");
-                    
-                    Properties props = new Properties();
-                    props.load(new FileInputStream(configFile));
-                    jdbcUrl = props.getProperty("jdbc.URL", "jdbc:postgresql://" + dbHost + ":" + dbPort + "/" + dbName);
-                } catch (Exception e) {
+                // Build JDBC URL based on driver type (fallback)
+                if (dbDriver.contains("postgresql")) {
+                    jdbcUrl = "jdbc:postgresql://" + dbHost + ":" + dbPort + "/" + dbName;
+                } else if (dbDriver.contains("oracle")) {
+                    jdbcUrl = "jdbc:oracle:thin:@" + dbHost + ":" + dbPort + ":" + dbName;
+                } else if (dbDriver.contains("sqlserver")) {
+                    jdbcUrl = "jdbc:sqlserver://" + dbHost + ":" + dbPort + ";databaseName=" + dbName;
+                    // Windows authentication support
+                    if (dbUser.isEmpty() || dbPassword.isEmpty()) {
+                        jdbcUrl += ";integratedSecurity=true";
+                        System.out.println("  ℹ️  Using Windows authentication (integratedSecurity=true)");
+                    }
+                } else if (dbDriver.contains("db2")) {
+                    jdbcUrl = "jdbc:db2://" + dbHost + ":" + dbPort + "/" + dbName;
+                } else {
                     jdbcUrl = "jdbc:postgresql://" + dbHost + ":" + dbPort + "/" + dbName;
                 }
             }

@@ -1,0 +1,249 @@
+================================================================================
+dSeries Health Check Tool - Version 2.9.0 Release Summary
+================================================================================
+Release Date: 2026-02-13
+Previous Version: 2.8.0
+
+================================================================================
+CRITICAL FIX: ORACLE JDBC URL HANDLING
+================================================================================
+
+Version 2.9.0 fixes the ORA-17866 error (Invalid number format for port number)
+that occurred when connecting to Oracle databases with complex URL formats.
+
+================================================================================
+ISSUES FIXED
+================================================================================
+
+1. ORACLE JDBC URL PARSING ERROR (ORA-17866)
+   ------------------------------------------
+   ❌ PROBLEM (v2.8.0):
+   - Tool tried to parse and rebuild Oracle JDBC URL
+   - Failed to handle format: jdbc:oracle:thin:@//[10.252.9.27]:1521/ORCL
+   - Parsing regex couldn't handle brackets and double slashes
+   - Rebuilt URL incorrectly as: jdbc:oracle:thin:@//[10.252.9.27]:1521:ORCL
+   - Result: ORA-17866: Invalid number format for port number
+   
+   ✅ SOLUTION (v2.9.0):
+   - Now uses original JDBC URL directly from db.properties
+   - No parsing or rebuilding of complex Oracle URLs
+   - Preserves all URL formats including:
+     * jdbc:oracle:thin:@//host:port/service
+     * jdbc:oracle:thin:@//[host]:port/service
+     * jdbc:oracle:thin:@host:port:sid
+     * jdbc:oracle:thin:@host:port/service
+   
+   Code change:
+   ```java
+   // OLD (v2.8.0):
+   // Always rebuilt URL from parsed components
+   jdbcUrl = "jdbc:oracle:thin:@" + dbHost + ":" + dbPort + ":" + dbName;
+   
+   // NEW (v2.9.0):
+   // Use original URL from db.properties
+   if (originalJdbcUrl != null && !originalJdbcUrl.isEmpty()) {
+       jdbcUrl = originalJdbcUrl;
+   }
+   ```
+
+2. JVM CONFIG FILE DETECTION ON UNIX
+   ----------------------------------
+   ❌ PROBLEM (v2.8.0):
+   - Checked bin/espserver and bin/espserver.sh
+   - dSeries uses bin/startServer on Unix systems
+   - Result: JVM Heap: 0 MB
+   
+   ✅ SOLUTION (v2.9.0):
+   - Now checks bin/startServer first (dSeries standard)
+   - Falls back to bin/espserver and bin/espserver.sh
+   - Correctly detects JVM heap size on Unix
+   
+   Check order:
+   1. conf/windows.service.properties (Windows)
+   2. conf/server.properties (Generic)
+   3. bin/startServer (Unix - PRIMARY)
+   4. bin/espserver (Unix - fallback)
+   5. bin/espserver.sh (Unix - fallback)
+
+3. CLASSPATH SCRIPT NAMING
+   ------------------------
+   ✅ CONFIRMED (Already correct in v2.8.0):
+   - Windows: bin/classpath.bat
+   - Unix: bin/classpath.sh or bin/classpath
+   - No changes needed
+
+4. ENHANCED ORACLE URL PARSING
+   ----------------------------
+   ✅ IMPROVEMENT (v2.9.0):
+   - Added support for multiple Oracle URL patterns
+   - Pattern 1: jdbc:oracle:thin:@//[host]:port/service (with brackets)
+   - Pattern 2: jdbc:oracle:thin:@//host:port/service (standard)
+   - Pattern 3: jdbc:oracle:thin:@host:port:sid (legacy)
+   - Fallback to original URL if parsing fails
+
+================================================================================
+TECHNICAL DETAILS
+================================================================================
+
+Oracle JDBC URL Formats Supported:
+----------------------------------
+1. Service Name with //: 
+   jdbc:oracle:thin:@//hostname:1521/servicename
+   
+2. Service Name with brackets:
+   jdbc:oracle:thin:@//[10.252.9.27]:1521/ORCL
+   
+3. SID format (legacy):
+   jdbc:oracle:thin:@hostname:1521:sid
+   
+4. RAC/Cluster URLs:
+   jdbc:oracle:thin:@(DESCRIPTION=...)
+
+Original URL Preservation:
+-------------------------
+The tool now stores the original JDBC URL from db.properties and uses it
+directly for connection, avoiding any parsing/rebuilding issues.
+
+Benefits:
+- Preserves complex URL formats
+- Supports all Oracle connection types
+- No risk of URL corruption
+- Works with RAC, TNS names, etc.
+
+================================================================================
+FILES MODIFIED
+================================================================================
+
+1. DSeriesHealthCheck.java
+   - Added originalJdbcUrl field to store URL from db.properties
+   - Modified loadDatabaseConfig() to store original URL
+   - Modified connectToDatabase() to use original URL
+   - Enhanced Oracle URL parsing with 3 patterns
+   - Fixed JVM config detection (added startServer)
+   - Updated version to 2.9.0
+
+2. dseries-healthcheck.jar
+   - Rebuilt with v2.9.0 fixes
+
+================================================================================
+TESTING VERIFICATION
+================================================================================
+
+To verify the Oracle connection fix:
+
+1. Check URL Usage:
+   ```
+   Look for this line in output:
+   ℹ️  Using JDBC URL from db.properties
+   ```
+
+2. Check Connection Success:
+   ```
+   Should see:
+   ✅ JDBC driver loaded successfully
+   ✅ Database connection established successfully
+   
+   NOT:
+   ⚠️  Connection attempt failed: ORA-17866
+   ```
+
+3. Check JVM Heap on Unix:
+   ```
+   Should show actual heap size from startServer:
+   ✅ JVM Heap: 4096 MB (OK)
+   
+   NOT:
+   ❌ JVM Heap: 0 MB (Below minimum 4096 MB)
+   ```
+
+4. Verify db.properties URL Format:
+   ```bash
+   grep "jdbc.URL" /opt/CA/ESPdSeriesWAServer_R25_0_Build122/conf/db.properties
+   ```
+   
+   The tool will use this URL exactly as-is.
+
+================================================================================
+MIGRATION FROM v2.8.0
+================================================================================
+
+No action required:
+- Simply replace JAR file
+- No configuration changes needed
+- Backward compatible
+
+Benefits:
+- Oracle connections now work with all URL formats
+- Unix JVM detection improved
+- More reliable across different dSeries versions
+
+================================================================================
+TROUBLESHOOTING
+================================================================================
+
+If you still get ORA-17866:
+1. Check db.properties has correct jdbc.URL format
+2. Verify URL works with sqlplus or other Oracle tools
+3. Check for typos in host/port/service name
+4. Ensure Oracle listener is running
+
+If JVM Heap shows 0 MB on Unix:
+1. Check if bin/startServer exists
+2. Look for -Xmx parameter in startServer
+3. May need custom script detection
+
+If connection fails:
+1. Verify database is running
+2. Check network connectivity
+3. Verify credentials
+4. Check Oracle listener status: lsnrctl status
+
+================================================================================
+EXAMPLE OUTPUT (v2.9.0)
+================================================================================
+
+```
+[DB-CONFIG] Loading Database Configuration...
+  Using dSeries database config: /opt/CA/ESPdSeriesWAServer_R25_0_Build122/conf/db.properties
+  ℹ️  Attempting password decryption using dSeries encryption
+  ✅ Password decrypted successfully using dSeries encryption
+  ℹ️  Detected database type: ORACLE
+  ℹ️  JDBC Driver: oracle.jdbc.driver.OracleDriver
+  ✅ Database configuration loaded
+    Host: //[10.252.9.27]
+    Port: 1521
+    Database: ORCL
+    User: build122
+
+[DB-CONNECT] Connecting to Database...
+  Database connection details:
+    Driver: oracle.jdbc.driver.OracleDriver
+    URL: jdbc:***://[10.252.9.27]:1521/ORCL
+    User: bu******
+
+  Attempting to load JDBC driver: oracle.jdbc.driver.OracleDriver
+  ✅ JDBC driver loaded successfully
+  ℹ️  Using JDBC URL from db.properties
+  Connecting to database...
+  ✅ Database connection established successfully
+    Connection time: 234 ms
+  Validating connection...
+  ✅ Connection is valid (validated in 30 seconds)
+```
+
+================================================================================
+SUPPORT
+================================================================================
+
+For issues or questions:
+1. Review CUSTOMER_README.md
+2. Check UNIVERSAL_DATABASE_SUPPORT_GUIDE.md
+3. Review V2.9.0_ORACLE_URL_FIX.txt (this file)
+4. Contact dSeries support team
+
+GitHub Repository:
+https://github.gwd.broadcom.net/BROADCAST/dSeries_health_check
+
+================================================================================
+END OF RELEASE SUMMARY
+================================================================================
