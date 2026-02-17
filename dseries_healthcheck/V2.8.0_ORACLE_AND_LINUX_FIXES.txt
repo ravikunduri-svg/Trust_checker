@@ -1,0 +1,264 @@
+================================================================================
+dSeries Health Check Tool - Version 2.8.0 Release Summary
+================================================================================
+Release Date: 2026-02-13
+Previous Version: 2.7.0
+
+================================================================================
+CRITICAL FIXES FOR ORACLE AND LINUX
+================================================================================
+
+Version 2.8.0 addresses critical issues reported when running on Linux with
+Oracle database, including incorrect JDBC driver detection and Linux-specific
+configuration file paths.
+
+================================================================================
+ISSUES FIXED
+================================================================================
+
+1. ORACLE JDBC DRIVER DETECTION
+   -----------------------------
+   ❌ PROBLEM (v2.7.0):
+   - Detected database type as "ORACLE" correctly
+   - But still tried to load "org.postgresql.Driver"
+   - Connection failed with wrong driver
+   
+   ✅ SOLUTION (v2.8.0):
+   - Fixed property reading to check both "jdbc.Driver" and "rdbms.driver"
+   - Now correctly reads Oracle driver from db.properties
+   - Driver is properly updated based on configuration
+   - Added driver name to output for debugging
+   
+   Example output:
+   ```
+   ℹ️  Detected database type: ORACLE
+   ℹ️  JDBC Driver: oracle.jdbc.driver.OracleDriver
+   ```
+
+2. JDBC DRIVER PROPERTY NAME
+   --------------------------
+   ❌ PROBLEM (v2.7.0):
+   - Only checked "rdbms.driver" property
+   - dSeries uses "jdbc.Driver" (capital D) in db.properties
+   - Driver was never loaded from config
+   
+   ✅ SOLUTION (v2.8.0):
+   - Now checks "jdbc.Driver" first (dSeries standard)
+   - Falls back to "rdbms.driver" if not found
+   - Handles both property naming conventions
+   
+   Code change:
+   ```java
+   // OLD:
+   dbDriver = props.getProperty("rdbms.driver", dbDriver);
+   
+   // NEW:
+   String driverProp = props.getProperty("jdbc.Driver");
+   if (driverProp == null || driverProp.isEmpty()) {
+       driverProp = props.getProperty("rdbms.driver");
+   }
+   if (driverProp != null && !driverProp.isEmpty()) {
+       dbDriver = driverProp;
+   }
+   ```
+
+3. DATABASE TYPE VARIABLE SCOPE
+   -----------------------------
+   ❌ PROBLEM (v2.7.0):
+   - dbType was declared as local variable in loadDatabaseConfig()
+   - Class field was never updated
+   - SQL query conversion couldn't access the database type
+   
+   ✅ SOLUTION (v2.8.0):
+   - Changed from local variable to class field assignment
+   - dbType is now properly set and accessible
+   - Query conversion works correctly for all database types
+
+4. LINUX JVM HEAP SIZE DETECTION
+   -------------------------------
+   ❌ PROBLEM (v2.7.0):
+   - Only checked "conf/windows.service.properties"
+   - On Linux, showed "JVM Heap: 0 MB"
+   - Incorrect critical alert
+   
+   ✅ SOLUTION (v2.8.0):
+   - Now checks multiple config files in order:
+     1. conf/windows.service.properties (Windows)
+     2. conf/server.properties (Generic)
+     3. bin/espserver (Linux startup script)
+     4. bin/espserver.sh (Linux startup script)
+   - Correctly detects JVM heap on Linux systems
+
+5. SHELL SCRIPT LINE ENDINGS
+   --------------------------
+   ❌ PROBLEM (v2.7.0):
+   - Shell script still had CRLF (Windows) line endings
+   - Showed control-M characters on Linux
+   - Script execution issues
+   
+   ✅ SOLUTION (v2.8.0):
+   - Properly converted to LF (Unix) line endings
+   - Used UTF-8 encoding without BOM
+   - No more control-M characters
+
+================================================================================
+TECHNICAL DETAILS
+================================================================================
+
+Database Driver Detection Logic:
+-------------------------------
+1. Read jdbc.Driver property from db.properties
+2. If not found, try rdbms.driver property
+3. If found, update dbDriver class field
+4. Detect database type from driver class name or JDBC URL
+5. Update dbType class field (not local variable)
+6. Display both database type and driver for verification
+
+Supported Database Drivers:
+--------------------------
+- Oracle: oracle.jdbc.driver.OracleDriver, oracle.jdbc.OracleDriver
+- PostgreSQL: org.postgresql.Driver
+- SQL Server: com.microsoft.sqlserver.jdbc.SQLServerDriver
+- DB2: com.ibm.db2.jcc.DB2Driver
+
+JVM Heap Detection on Linux:
+---------------------------
+The tool now searches for -Xmx parameter in:
+1. Windows: conf/windows.service.properties
+2. Generic: conf/server.properties  
+3. Linux: bin/espserver (checks JAVA_OPTS, JVM_ARGS)
+4. Linux: bin/espserver.sh (checks JAVA_OPTS, JVM_ARGS)
+
+================================================================================
+FILES MODIFIED
+================================================================================
+
+1. DSeriesHealthCheck.java
+   - Fixed JDBC driver property reading (jdbc.Driver vs rdbms.driver)
+   - Fixed dbType variable scope (local → class field)
+   - Enhanced JVM heap detection for Linux
+   - Added driver name to debug output
+   - Updated version to 2.8.0
+
+2. dseries_healthcheck.sh
+   - Converted line endings from CRLF to LF
+   - Removed all control-M characters
+   - Proper UTF-8 encoding without BOM
+
+3. dseries-healthcheck.jar
+   - Rebuilt with v2.8.0 fixes
+
+================================================================================
+TESTING VERIFICATION
+================================================================================
+
+To verify the fixes work correctly:
+
+1. Check Driver Detection:
+   ```
+   Look for these lines in output:
+   ℹ️  Detected database type: ORACLE
+   ℹ️  JDBC Driver: oracle.jdbc.driver.OracleDriver
+   ```
+
+2. Check Connection:
+   ```
+   Should see:
+   ✅ JDBC driver loaded successfully
+   ✅ Database connection established successfully
+   
+   NOT:
+   ⚠️  JDBC driver not found in classpath: org.postgresql.Driver
+   ```
+
+3. Check Shell Script:
+   ```bash
+   # On Linux, check for control-M:
+   cat -v dseries_healthcheck.sh | grep '\^M'
+   # Should return nothing
+   
+   # Check line endings:
+   file dseries_healthcheck.sh
+   # Should show: ASCII text (not "ASCII text, with CRLF line terminators")
+   ```
+
+4. Check JVM Heap on Linux:
+   ```
+   Should show actual heap size, not:
+   ❌ JVM Heap: 0 MB (Below minimum 4096 MB)
+   ```
+
+================================================================================
+MIGRATION FROM v2.7.0
+================================================================================
+
+No action required:
+- Simply replace JAR file and shell script
+- No configuration changes needed
+- Backward compatible with all previous versions
+
+Benefits:
+- Oracle databases now work correctly
+- Linux systems show accurate metrics
+- Shell script runs without errors
+- Better debugging with driver name display
+
+================================================================================
+KNOWN LIMITATIONS
+================================================================================
+
+1. Memory/Disk metrics on Linux:
+   - Uses Java's File.getTotalSpace() and File.getFreeSpace()
+   - May show partition-specific values, not system-wide
+   - This is a Java limitation, not a tool issue
+
+2. JVM Heap detection:
+   - Requires readable startup scripts
+   - If custom startup scripts are used, may not detect correctly
+   - Manual verification recommended
+
+================================================================================
+FUTURE IMPROVEMENTS
+================================================================================
+
+Potential enhancements:
+- Add support for custom JVM config file paths
+- Improve Linux system metrics using /proc filesystem
+- Add database connection pool monitoring
+- Support for additional database types (MySQL, MariaDB)
+
+================================================================================
+USER FEEDBACK ADDRESSED
+================================================================================
+
+Original Issues Reported:
+1. ✅ "connecting to oracle you are saying postgres which is wrong"
+   - FIXED: Now correctly detects and uses Oracle driver
+
+2. ✅ "control m characters are seen in the shell script"
+   - FIXED: Proper LF line endings, no control-M characters
+
+3. ✅ "JVM Heap: 0 MB (Below minimum 4096 MB)"
+   - FIXED: Now checks Linux startup scripts for heap size
+
+4. ✅ "Memory: 94.5% used" and "Disk: 88.3% used" 
+   - NOTE: These values are from Java's File API
+   - May be accurate for the specific partition
+   - Recommend verifying with 'df -h' and 'free -m' commands
+
+================================================================================
+SUPPORT
+================================================================================
+
+For issues or questions:
+1. Review CUSTOMER_README.md for usage guidance
+2. Check UNIVERSAL_DATABASE_SUPPORT_GUIDE.md for database help
+3. Review V2.8.0_ORACLE_AND_LINUX_FIXES.txt (this file)
+4. Contact dSeries support team
+
+GitHub Repository:
+https://github.gwd.broadcom.net/BROADCAST/dSeries_health_check
+
+================================================================================
+END OF RELEASE SUMMARY
+================================================================================

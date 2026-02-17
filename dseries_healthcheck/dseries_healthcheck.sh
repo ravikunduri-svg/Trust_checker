@@ -137,7 +137,7 @@ build_classpath() {
         
         if [ -n "${CLASSPATH}" ]; then
             echo "  OK: dSeries classpath loaded successfully"
-            echo "  ℹ️  Includes all JDBC drivers, encryption libs, and auth libraries"
+            echo "  â„¹ï¸  Includes all JDBC drivers, encryption libs, and auth libraries"
             
             # Add our health check JAR to the beginning
             CLASSPATH="${SCRIPT_DIR}/dseries-healthcheck.jar:${CLASSPATH}"

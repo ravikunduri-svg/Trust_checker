@@ -15,8 +15,15 @@ import java.security.GeneralSecurityException;
  * Performs technical reviews including architecture, security, database,
  * agents, clients, high availability, and performance checks.
  * 
- * Version: 2.7.0
+ * Version: 2.8.0
  * Date: 2026-02-13
+ * 
+ * Version 2.8.0 Enhancements:
+ * - Fixed Oracle JDBC driver detection (was incorrectly using PostgreSQL driver)
+ * - Fixed dbDriver property reading (now checks both jdbc.Driver and rdbms.driver)
+ * - Fixed JVM heap size detection on Linux (now checks espserver/espserver.sh)
+ * - Removed control-M characters from shell script (proper LF line endings)
+ * - Added driver name to configuration output for debugging
  * 
  * Version 2.7.0 Enhancements:
  * - Verified all SQL queries against actual dSeries database schema
@@ -432,9 +439,16 @@ public class DSeriesHealthCheck {
         totalChecks++;
         
         try {
+            // Check multiple possible config files
             File propsFile = new File(installDir, "conf/windows.service.properties");
             if (!propsFile.exists()) {
                 propsFile = new File(installDir, "conf/server.properties");
+            }
+            if (!propsFile.exists()) {
+                propsFile = new File(installDir, "bin/espserver");  // Linux startup script
+            }
+            if (!propsFile.exists()) {
+                propsFile = new File(installDir, "bin/espserver.sh");  // Linux startup script
             }
             
             if (!propsFile.exists()) {
@@ -688,10 +702,17 @@ public class DSeriesHealthCheck {
                 }
             }
             
-            dbDriver = props.getProperty("rdbms.driver", dbDriver);
+            // Get JDBC driver - check both possible property names
+            String driverProp = props.getProperty("jdbc.Driver");
+            if (driverProp == null || driverProp.isEmpty()) {
+                driverProp = props.getProperty("rdbms.driver");
+            }
+            if (driverProp != null && !driverProp.isEmpty()) {
+                dbDriver = driverProp;
+            }
             
             // Detect database type from driver or URL
-            String dbType = props.getProperty("rdbms.type", "").toLowerCase();
+            dbType = props.getProperty("rdbms.type", "").toLowerCase();
             if (dbType.isEmpty()) {
                 if (jdbcUrl.contains("postgresql") || dbDriver.contains("postgresql")) {
                     dbType = "postgresql";
@@ -705,6 +726,7 @@ public class DSeriesHealthCheck {
             }
             
             System.out.println("  ℹ️  Detected database type: " + dbType.toUpperCase());
+            System.out.println("  ℹ️  JDBC Driver: " + dbDriver);
             
             // Parse JDBC URL to extract host, port, and database name
             if (jdbcUrl.contains("postgresql")) {
