@@ -1222,6 +1222,11 @@ public class DSeriesHealthCheck {
                 convertedQuery = convertedQuery.substring(0, convertedQuery.length() - 1).trim();
             }
             
+            // DEBUG: Log the actual SQL being executed
+            System.out.println("  [DEBUG] Original query: " + check.query);
+            System.out.println("  [DEBUG] Converted query: " + convertedQuery);
+            System.out.println("  [DEBUG] Database type: " + dbType);
+            
             rs = stmt.executeQuery(convertedQuery);
             
             queryEndTime = System.currentTimeMillis();
@@ -1277,6 +1282,7 @@ public class DSeriesHealthCheck {
             warningChecks++;
             String message = "⚠️  Query failed: " + e.getMessage();
             System.out.println("  " + message);
+            System.out.println("  [DEBUG] Failed SQL: " + check.query);
             checkResults.add(new CheckResult(check.checkId, check.checkName, check.category,
                 check.severity, "WARNING", message, "Check query syntax and table existence"));
         } finally {
