@@ -253,11 +253,13 @@ FROM ESP_STAGE2HAC;
 -- @CHECK_NAME: Active Generations
 -- @CHECK_CATEGORY: Performance
 -- @SEVERITY: INFO
--- @DESCRIPTION: Count active application generations
+-- @DESCRIPTION: Count active application generations (excluding completed)
 -- @THRESHOLD_OPERATOR: <
 -- @THRESHOLD_VALUE: 10000
 -- @REMEDIATION: Review and clean up old generations
-SELECT COUNT(DISTINCT appl_gen_no) active_generations FROM ESP_APPLICATION;
+SELECT COUNT(DISTINCT appl_gen_no) active_generations 
+FROM ESP_APPLICATION 
+WHERE STATE <> 'COMPLETE';
 
 -- @CHECK_ID: PERF-002
 -- @CHECK_NAME: Long Running Jobs

@@ -1,0 +1,252 @@
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                                                                               ║
+║   ESP dSeries Health Check Tool v4.0.0                                       ║
+║   Application Best Practices Analysis - Quick Start Guide                    ║
+║                                                                               ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+┌───────────────────────────────────────────────────────────────────────────────┐
+│ WHAT'S NEW IN v4.0.0                                                          │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+  ✓ Scans your application XML files for best practices violations
+  ✓ Identifies security risks (hardcoded credentials, paths)
+  ✓ Recommends cloud plugin integrations (40+ plugins supported)
+  ✓ Provides modernization roadmap with specific actions
+  ✓ Links to official Broadcom documentation
+
+┌───────────────────────────────────────────────────────────────────────────────┐
+│ QUICK START (3 STEPS)                                                         │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+  1. PREPARE: Place application XMLs in apps/ directory
+     
+     Windows:   C:\CA\ESPdSeriesWAServer_R12_4\apps\*.xml
+     Unix:      /opt/CA/ESPdSeriesWAServer_R12_4/apps/*.xml
+
+  2. RUN: Execute health check as normal
+     
+     Windows:   dseries_healthcheck.bat C:\CA\ESPdSeriesWAServer_R12_4
+     Unix:      ./dseries_healthcheck.sh /opt/CA/ESPdSeriesWAServer_R12_4
+
+  3. REVIEW: Check "APPLICATION BEST PRACTICES ANALYSIS" section
+
+┌───────────────────────────────────────────────────────────────────────────────┐
+│ WHAT IT CHECKS                                                                │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+  SECURITY (HIGH Priority)
+  ─────────────────────────
+  ⚠️  Hardcoded credentials in commands
+  ⚠️  Hardcoded credentials in POJO parameters
+  ⚠️  Passwords visible in XML files
+
+  CONFIGURATION (MEDIUM Priority)
+  ────────────────────────────────
+  ℹ️  Hardcoded file system paths
+  ℹ️  Large inline JavaScript code
+  ℹ️  Large inline scripts
+  ℹ️  Missing application defaults
+
+  RELIABILITY (LOW Priority)
+  ──────────────────────────
+  💡 Missing retry configuration
+  💡 No calendar usage for complex schedules
+
+  CLOUD OPPORTUNITIES
+  ───────────────────
+  ☁️  AWS CLI → Native AWS plugins (S3, Lambda, Batch, Glue, EMR, etc.)
+  ☁️  Azure CLI → Native Azure plugins (Blob, Data Factory, Synapse, etc.)
+  ☁️  GCP CLI → Native GCP plugins (GCS, Dataproc, BigQuery, etc.)
+  ☁️  Databricks CLI → Databricks plugin
+  ☁️  FTP jobs → Cloud storage plugins
+
+┌───────────────────────────────────────────────────────────────────────────────┐
+│ SAMPLE OUTPUT                                                                 │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+  ═══════════════════════════════════════════════════════════════════
+  APPLICATION BEST PRACTICES ANALYSIS
+  ═══════════════════════════════════════════════════════════════════
+
+  Scanning application directories...
+    Scanning: C:\CA\ESPdSeriesWAServer_R12_4\apps
+
+  ─── Analysis Summary ───
+
+  Applications scanned: 15
+  Total jobs analyzed: 342
+  Best practice violations: 23
+  Cloud integration opportunities: 47
+
+  ─── Best Practice Violations ───
+
+  Category: Security
+
+  ⚠️ Credentials in Command (HIGH)
+     Application: PAYROLL_PROCESSING
+     Job: EXPORT_SALARY_DATA
+     Issue: Command may contain embedded credentials or passwords
+     Recommendation: Use global variables with secure storage for credentials.
+
+  ─── Cloud Integration Opportunities ───
+
+  Integration Type: Storage
+
+  ☁️ Amazon S3 Plugin Extension
+     Application: FILE_PROCESSING
+     Current Job: UPLOAD_TO_S3 (cmd_job)
+     Opportunity: Replace AWS CLI S3 commands with native S3 plugin
+     Benefit: Better error handling, built-in monitoring
+     Plugin: Amazon S3 Plugin Extension
+     Documentation: https://techdocs.broadcom.com/...
+
+┌───────────────────────────────────────────────────────────────────────────────┐
+│ COMMON FIXES                                                                  │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+  1. HARDCODED CREDENTIALS
+     ─────────────────────
+     ❌ BAD:  <command>mysql -u admin -p MyPassword123 mydb</command>
+     ✅ GOOD: <command>mysql -u %VAR('DB_USER') -p %VAR('DB_PASSWORD') mydb</command>
+
+  2. HARDCODED PATHS
+     ───────────────
+     ❌ BAD:  <command>C:\data\scripts\process.bat</command>
+     ✅ GOOD: <command>%VAR('SCRIPT_DIR')\process.bat</command>
+
+  3. CLOUD MIGRATION (AWS S3 Example)
+     ─────────────────────────────────
+     ❌ OLD:  <cmd_job> with "aws s3 cp file.txt s3://bucket/"
+     ✅ NEW:  <pojo_job> with S3Pojo.upload() method
+
+┌───────────────────────────────────────────────────────────────────────────────┐
+│ SUPPORTED CLOUD PLUGINS (40+)                                                 │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+  AWS (8 plugins)
+  ───────────────
+  • Amazon S3, Lambda, Batch, Glue, EMR, Step Functions, EventBridge, MWAA
+
+  AZURE (5 plugins)
+  ─────────────────
+  • Azure Blob, Data Factory, Synapse, Logic Apps, Event Grid
+
+  GOOGLE CLOUD (6 plugins)
+  ────────────────────────
+  • Cloud Storage, Dataproc, Dataflow, BigQuery, Composer, Cloud Run
+
+  DATA PLATFORMS (3 plugins)
+  ──────────────────────────
+  • Databricks, dbt, Informatica IICS
+
+  ENTERPRISE (10+ plugins)
+  ────────────────────────
+  • SAP (S/4 HANA, Integration Suite, DI, ERP Cloud, Business Objects, JSS)
+  • Oracle (Cloud ERP, OCI, EPM)
+  • Power BI, Workday
+
+  ORCHESTRATION (3 plugins)
+  ─────────────────────────
+  • Apache Airflow, Ansible Tower, Kafka
+
+  CONTAINERS (3 plugins)
+  ──────────────────────
+  • Kubernetes/OpenShift, CloudFoundry, VMware Aria
+
+  Full list: https://techdocs.broadcom.com/...plugin-extensions/
+
+┌───────────────────────────────────────────────────────────────────────────────┐
+│ BENEFITS                                                                      │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+  SECURITY
+  ────────
+  ✓ Identify credential exposure risks
+  ✓ Promote secure credential management
+  ✓ Reduce security audit findings
+
+  MAINTAINABILITY
+  ───────────────
+  ✓ Reduce configuration duplication
+  ✓ Improve portability across environments
+  ✓ Easier updates and changes
+
+  RELIABILITY
+  ───────────
+  ✓ Better error handling with cloud plugins
+  ✓ Automatic retry logic
+  ✓ Built-in status tracking
+
+  MODERNIZATION
+  ─────────────
+  ✓ Clear cloud migration path
+  ✓ Specific plugin recommendations
+  ✓ Official documentation links
+
+┌───────────────────────────────────────────────────────────────────────────────┐
+│ TROUBLESHOOTING                                                               │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+  Q: No applications found?
+  A: • Check XMLs are in apps/ directory
+     • Verify file permissions
+     • Ensure valid XML syntax
+
+  Q: Missing cloud opportunities?
+  A: • Tool detects CLI commands in <command> tags
+     • Check for standard CLI syntax (aws, az, gcloud, etc.)
+     • Custom wrapper scripts may not be detected
+
+  Q: How to implement recommendations?
+  A: • See APPLICATION_BEST_PRACTICES_GUIDE.md for detailed examples
+     • Follow links to Broadcom plugin documentation
+     • Test changes in development environment first
+
+┌───────────────────────────────────────────────────────────────────────────────┐
+│ DOCUMENTATION                                                                 │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+  📄 APPLICATION_BEST_PRACTICES_GUIDE.md
+     Complete feature guide with implementation examples
+
+  📄 VERSION_4.0_RELEASE_NOTES.md
+     Release notes and technical details
+
+  🌐 Broadcom Documentation
+     https://techdocs.broadcom.com/us/en/ca-enterprise-software/
+     intelligent-automation/ca-workload-automation-de/25-0.html
+
+  🌐 Plugin Extensions
+     https://techdocs.broadcom.com/us/en/ca-enterprise-software/
+     intelligent-automation/workload-automation-plugin-extensions/
+
+┌───────────────────────────────────────────────────────────────────────────────┐
+│ NEXT STEPS                                                                    │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+  1. Run health check with application XMLs
+  2. Review violations and opportunities
+  3. Prioritize HIGH severity issues first
+  4. Plan cloud plugin migrations
+  5. Implement fixes in development environment
+  6. Test thoroughly before production
+  7. Run health check again to verify improvements
+
+┌───────────────────────────────────────────────────────────────────────────────┐
+│ CONTACT & SUPPORT                                                             │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+  For questions or issues:
+  • Review documentation files
+  • Check Broadcom's official documentation
+  • Contact your dSeries support team
+
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                                                                               ║
+║   Thank you for using ESP dSeries Health Check Tool v4.0.0!                  ║
+║                                                                               ║
+║   Helping you build a secure, maintainable, and modern                       ║
+║   workload automation environment.                                           ║
+║                                                                               ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
