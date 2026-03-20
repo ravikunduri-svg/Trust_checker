@@ -2990,11 +2990,23 @@ public class DSeriesHealthCheck {
         if (appsPathFile.isDirectory()) {
             System.out.println("Scanning directory: " + appsPathFile.getAbsolutePath());
             collectXMLFiles(appsPathFile, xmlFiles);
-        } else if (appsPathFile.getName().toLowerCase().endsWith(".xml")) {
-            System.out.println("Analyzing file: " + appsPathFile.getAbsolutePath());
-            xmlFiles.add(appsPathFile);
+        } else if (appsPathFile.isFile()) {
+            // Accept both .xml files and files without extension (dSeries native format)
+            String fileName = appsPathFile.getName().toLowerCase();
+            if (fileName.endsWith(".xml") || !fileName.contains(".")) {
+                if (isXMLFile(appsPathFile)) {
+                    System.out.println("Analyzing file: " + appsPathFile.getAbsolutePath());
+                    xmlFiles.add(appsPathFile);
+                } else {
+                    System.err.println("ERROR: File does not contain valid XML content");
+                    System.exit(2);
+                }
+            } else {
+                System.err.println("ERROR: File must be XML format (.xml extension or no extension)");
+                System.exit(2);
+            }
         } else {
-            System.err.println("ERROR: Path must be a directory or XML file");
+            System.err.println("ERROR: Path must be a directory or file");
             System.exit(2);
         }
         
@@ -3360,9 +3372,12 @@ public class DSeriesHealthCheck {
         NodeList boxJobs = doc.getElementsByTagName("box_job");
         NodeList dbJobs = doc.getElementsByTagName("db_job");
         NodeList ftpJobs = doc.getElementsByTagName("ftp_job");
+        NodeList unixJobs = doc.getElementsByTagName("unix_job");
+        NodeList ntJobs = doc.getElementsByTagName("nt_job");
         
         result.jobCount = cmdJobs.getLength() + scriptJobs.getLength() + pojoJobs.getLength() + 
-                         boxJobs.getLength() + dbJobs.getLength() + ftpJobs.getLength();
+                         boxJobs.getLength() + dbJobs.getLength() + ftpJobs.getLength() +
+                         unixJobs.getLength() + ntJobs.getLength();
         
         // Analyze application-level best practices
         analyzeApplicationLevel(applElement, result);
@@ -3675,22 +3690,64 @@ public class DSeriesHealthCheck {
     
     /**
      * Analyze ftp_job for cloud opportunities
+     * Only recommend cloud storage for actual FTP/SFTP operations, not native file transfers
      */
     private static void analyzeFtpJob(Element jobElement, ApplicationAnalysisResult result) {
         String jobName = jobElement.getAttribute("name");
         String appName = result.applicationName;
         
-        // FTP jobs can be replaced with cloud storage plugins
-        result.cloudOpportunities.add(new CloudOpportunity(
-            "File Transfer",
-            "Cloud Storage Plugin Extensions",
-            appName,
-            jobName,
-            "ftp_job",
-            "Replace FTP with cloud storage (S3, Azure Blob, GCS) for better reliability and security",
-            "Higher availability, better security, automatic versioning, lifecycle management",
-            "https://techdocs.broadcom.com/us/en/ca-enterprise-software/intelligent-automation/workload-automation-plugin-extensions/GA/workload-automation-agent-plugin-extension.html"
-        ));
+        // Check if this is actually an FTP/SFTP job (not just native file transfer)
+        NodeList hostnameNodes = jobElement.getElementsByTagName("hostname");
+        NodeList hostNodes = jobElement.getElementsByTagName("host");
+        NodeList serverNodes = jobElement.getElementsByTagName("server");
+        
+        boolean hasRemoteHost = false;
+        String hostValue = null;
+        
+        // Check for hostname
+        if (hostnameNodes.getLength() > 0) {
+            hostValue = hostnameNodes.item(0).getTextContent();
+            hasRemoteHost = hostValue != null && !hostValue.trim().isEmpty() && 
+                           !hostValue.equals("localhost") && !hostValue.equals("127.0.0.1");
+        }
+        
+        // Check for host
+        if (!hasRemoteHost && hostNodes.getLength() > 0) {
+            hostValue = hostNodes.item(0).getTextContent();
+            hasRemoteHost = hostValue != null && !hostValue.trim().isEmpty() && 
+                           !hostValue.equals("localhost") && !hostValue.equals("127.0.0.1");
+        }
+        
+        // Check for server
+        if (!hasRemoteHost && serverNodes.getLength() > 0) {
+            hostValue = serverNodes.item(0).getTextContent();
+            hasRemoteHost = hostValue != null && !hostValue.trim().isEmpty() && 
+                           !hostValue.equals("localhost") && !hostValue.equals("127.0.0.1");
+        }
+        
+        // Only recommend cloud storage for actual FTP/SFTP operations
+        if (hasRemoteHost) {
+            // Check if it's already using cloud storage
+            String hostLower = hostValue != null ? hostValue.toLowerCase() : "";
+            boolean isCloudStorage = hostLower.contains("s3.") || 
+                                    hostLower.contains("blob.core.windows.net") ||
+                                    hostLower.contains("storage.googleapis.com") ||
+                                    hostLower.contains("amazonaws.com");
+            
+            if (!isCloudStorage) {
+                result.cloudOpportunities.add(new CloudOpportunity(
+                    "File Transfer",
+                    "Cloud Storage Plugin Extensions",
+                    appName,
+                    jobName,
+                    "ftp_job",
+                    "Replace FTP/SFTP with cloud storage (S3, Azure Blob, GCS) for better reliability and security",
+                    "Higher availability, better security, automatic versioning, lifecycle management",
+                    "https://techdocs.broadcom.com/us/en/ca-enterprise-software/intelligent-automation/workload-automation-plugin-extensions/GA/workload-automation-agent-plugin-extension.html"
+                ));
+            }
+        }
+        // If no remote host, it's likely a native file transfer - no cloud recommendation needed
     }
     
     /**
