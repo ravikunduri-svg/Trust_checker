@@ -296,6 +296,18 @@ public class DSeriesHealthCheck {
             System.exit(2);
         }
         
+        // Check for standalone application analysis mode
+        if (args[0].equals("--analyze-apps") || args[0].equals("-a")) {
+            if (args.length < 2) {
+                System.err.println("ERROR: Application directory path required");
+                System.err.println();
+                printUsage();
+                System.exit(2);
+            }
+            runStandaloneApplicationAnalysis(args[1]);
+            return;
+        }
+        
         installDir = args[0];
         
         // Optional: Use external database config (for testing/non-standard setups)
@@ -375,24 +387,43 @@ public class DSeriesHealthCheck {
     }
     
     private static void printUsage() {
-        System.out.println("Usage: java DSeriesHealthCheck <install_dir> [sql_config_file]");
+        System.out.println("Usage:");
+        System.out.println("  1. Full Health Check:");
+        System.out.println("     java DSeriesHealthCheck <install_dir> [sql_config_file]");
+        System.out.println();
+        System.out.println("  2. Standalone Application Analysis:");
+        System.out.println("     java DSeriesHealthCheck --analyze-apps <apps_directory>");
+        System.out.println("     java DSeriesHealthCheck -a <apps_directory>");
         System.out.println();
         System.out.println("Arguments:");
-        System.out.println("  install_dir      - dSeries installation directory (required)");
-        System.out.println("  sql_config_file  - SQL queries configuration file (optional, default: config/health_check_queries.sql)");
+        System.out.println("  install_dir      - dSeries installation directory (required for full check)");
+        System.out.println("  sql_config_file  - SQL queries configuration file (optional)");
+        System.out.println("  apps_directory   - Directory containing exported application XML files");
         System.out.println();
-        System.out.println("Database Configuration:");
-        System.out.println("  The tool automatically uses: <install_dir>/conf/db.properties");
-        System.out.println("  This is the same configuration used by dSeries server");
-        System.out.println("  Supports encrypted passwords (ENC format)");
+        System.out.println("Standalone Application Analysis Mode:");
+        System.out.println("  Analyzes exported application XML files without requiring dSeries installation");
+        System.out.println("  Perfect for analyzing artifacts exported from Desktop Client or CLI");
+        System.out.println("  Provides best practices validation and cloud integration recommendations");
+        System.out.println("  No database connection required");
         System.out.println();
         System.out.println("Examples:");
+        System.out.println("  # Full health check");
         System.out.println("  java DSeriesHealthCheck C:/CA/ESPdSeriesWAServer_R12_4");
-        System.out.println("  java DSeriesHealthCheck C:/CA/ESPdSeriesWAServer_R12_4 custom_queries.sql");
+        System.out.println();
+        System.out.println("  # Analyze exported applications only");
+        System.out.println("  java DSeriesHealthCheck --analyze-apps C:/exports/applications");
+        System.out.println("  java DSeriesHealthCheck -a /home/user/exported_apps");
+        System.out.println();
+        System.out.println("  # Analyze single application file");
+        System.out.println("  java DSeriesHealthCheck --analyze-apps C:/exports/PAYROLL_APP.xml");
+        System.out.println();
+        System.out.println("How to Export Applications:");
+        System.out.println("  1. Desktop Client: Right-click application -> Export -> Save as XML");
+        System.out.println("  2. CLI: espappexport -A APPLICATION_NAME -f output.xml");
+        System.out.println("  3. REST API: GET /application/{name}/export");
         System.out.println();
         System.out.println("Advanced (for testing with external db.properties):");
         System.out.println("  java DSeriesHealthCheck C:/CA/ESPdSeriesWAServer_R12_4 /path/to/db.properties");
-        System.out.println("  java DSeriesHealthCheck C:/CA/ESPdSeriesWAServer_R12_4 /path/to/db.properties custom_queries.sql");
     }
     
     private static void printHeader() {
@@ -2924,6 +2955,204 @@ public class DSeriesHealthCheck {
             case "HIGH": return 2;
             case "MEDIUM": return 1;
             default: return 0;
+        }
+    }
+    
+    /**
+     * Run standalone application analysis mode (no dSeries installation required)
+     */
+    private static void runStandaloneApplicationAnalysis(String appsPath) {
+        System.out.println("═══════════════════════════════════════════════════════════════════");
+        System.out.println("  ESP dSeries Application Best Practices Analyzer v4.0.0");
+        System.out.println("═══════════════════════════════════════════════════════════════════");
+        System.out.println("  Date: " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()));
+        System.out.println("  Analysis Path: " + appsPath);
+        System.out.println("═══════════════════════════════════════════════════════════════════");
+        System.out.println();
+        
+        File appsPathFile = new File(appsPath);
+        if (!appsPathFile.exists()) {
+            System.err.println("ERROR: Path not found: " + appsPath);
+            System.err.println();
+            System.err.println("Please provide a valid path to:");
+            System.err.println("  - Directory containing application XML files");
+            System.err.println("  - Single application XML file");
+            System.exit(2);
+        }
+        
+        System.out.println("Starting application analysis...");
+        System.out.println();
+        
+        List<File> xmlFiles = new ArrayList<>();
+        
+        // Collect XML files
+        if (appsPathFile.isDirectory()) {
+            System.out.println("Scanning directory: " + appsPathFile.getAbsolutePath());
+            collectXMLFiles(appsPathFile, xmlFiles);
+        } else if (appsPathFile.getName().toLowerCase().endsWith(".xml")) {
+            System.out.println("Analyzing file: " + appsPathFile.getAbsolutePath());
+            xmlFiles.add(appsPathFile);
+        } else {
+            System.err.println("ERROR: Path must be a directory or XML file");
+            System.exit(2);
+        }
+        
+        if (xmlFiles.isEmpty()) {
+            System.out.println("⚠️  No XML files found in: " + appsPath);
+            System.out.println();
+            System.out.println("Tips:");
+            System.out.println("  - Ensure XML files have .xml extension");
+            System.out.println("  - Check file permissions");
+            System.out.println("  - Export applications from dSeries Desktop Client or CLI");
+            System.exit(0);
+        }
+        
+        System.out.println("Found " + xmlFiles.size() + " XML file(s) to analyze");
+        System.out.println();
+        
+        // Analyze applications
+        System.out.println("═══════════════════════════════════════════════════════════════════");
+        System.out.println("APPLICATION BEST PRACTICES ANALYSIS");
+        System.out.println("═══════════════════════════════════════════════════════════════════\n");
+        
+        int totalApps = 0;
+        int totalJobs = 0;
+        int parseErrors = 0;
+        List<BestPracticeViolation> violations = new ArrayList<>();
+        List<CloudOpportunity> cloudOpportunities = new ArrayList<>();
+        
+        for (File xmlFile : xmlFiles) {
+            try {
+                ApplicationAnalysisResult result = analyzeApplicationXML(xmlFile);
+                if (result != null) {
+                    totalApps++;
+                    totalJobs += result.jobCount;
+                    violations.addAll(result.violations);
+                    cloudOpportunities.addAll(result.cloudOpportunities);
+                    System.out.println("  ✓ " + xmlFile.getName() + " (" + result.jobCount + " jobs)");
+                }
+            } catch (Exception e) {
+                parseErrors++;
+                System.out.println("  ✗ " + xmlFile.getName() + " - Error: " + e.getMessage());
+            }
+        }
+        
+        System.out.println();
+        System.out.println("─── Analysis Summary ───\n");
+        System.out.println("Files processed: " + xmlFiles.size());
+        System.out.println("Applications analyzed: " + totalApps);
+        System.out.println("Total jobs analyzed: " + totalJobs);
+        if (parseErrors > 0) {
+            System.out.println("Parse errors: " + parseErrors);
+        }
+        System.out.println("Best practice violations: " + violations.size());
+        System.out.println("Cloud integration opportunities: " + cloudOpportunities.size());
+        System.out.println();
+        
+        // Report violations
+        if (!violations.isEmpty()) {
+            System.out.println("─── Best Practice Violations ───\n");
+            
+            Map<String, List<BestPracticeViolation>> violationsByCategory = new LinkedHashMap<>();
+            for (BestPracticeViolation v : violations) {
+                violationsByCategory.computeIfAbsent(v.category, k -> new ArrayList<>()).add(v);
+            }
+            
+            for (Map.Entry<String, List<BestPracticeViolation>> entry : violationsByCategory.entrySet()) {
+                System.out.println("Category: " + entry.getKey());
+                System.out.println();
+                
+                for (BestPracticeViolation v : entry.getValue()) {
+                    String icon = v.severity.equals("HIGH") ? "⚠️" : 
+                                 v.severity.equals("MEDIUM") ? "ℹ️" : "💡";
+                    
+                    System.out.println(icon + " " + v.rule + " (" + v.severity + ")");
+                    System.out.println("   Application: " + v.applicationName);
+                    if (v.jobName != null) {
+                        System.out.println("   Job: " + v.jobName);
+                    }
+                    System.out.println("   Issue: " + v.description);
+                    System.out.println("   Recommendation: " + v.recommendation);
+                    System.out.println();
+                }
+            }
+        }
+        
+        // Report cloud opportunities
+        if (!cloudOpportunities.isEmpty()) {
+            System.out.println("─── Cloud Integration Opportunities ───\n");
+            
+            Map<String, List<CloudOpportunity>> opportunitiesByType = new LinkedHashMap<>();
+            for (CloudOpportunity opp : cloudOpportunities) {
+                opportunitiesByType.computeIfAbsent(opp.integrationType, k -> new ArrayList<>()).add(opp);
+            }
+            
+            for (Map.Entry<String, List<CloudOpportunity>> entry : opportunitiesByType.entrySet()) {
+                System.out.println("Integration Type: " + entry.getKey());
+                System.out.println();
+                
+                for (CloudOpportunity opp : entry.getValue()) {
+                    System.out.println("☁️  " + opp.pluginName);
+                    System.out.println("   Application: " + opp.applicationName);
+                    System.out.println("   Current Job: " + opp.jobName + " (" + opp.currentJobType + ")");
+                    System.out.println("   Opportunity: " + opp.description);
+                    System.out.println("   Benefit: " + opp.benefit);
+                    System.out.println("   Plugin: " + opp.pluginName);
+                    System.out.println("   Documentation: " + opp.documentationUrl);
+                    System.out.println();
+                }
+            }
+        }
+        
+        if (violations.isEmpty() && cloudOpportunities.isEmpty()) {
+            System.out.println("✅ No issues or opportunities identified");
+            System.out.println("   Applications follow best practices");
+        }
+        
+        // Summary recommendations
+        System.out.println();
+        System.out.println("─── Summary ───\n");
+        
+        int highSeverity = (int) violations.stream().filter(v -> v.severity.equals("HIGH")).count();
+        int mediumSeverity = (int) violations.stream().filter(v -> v.severity.equals("MEDIUM")).count();
+        int lowSeverity = (int) violations.stream().filter(v -> v.severity.equals("LOW")).count();
+        
+        if (highSeverity > 0) {
+            System.out.println("⚠️  " + highSeverity + " HIGH severity issue(s) found - Address immediately");
+        }
+        if (mediumSeverity > 0) {
+            System.out.println("ℹ️  " + mediumSeverity + " MEDIUM severity issue(s) found - Plan fixes soon");
+        }
+        if (lowSeverity > 0) {
+            System.out.println("💡 " + lowSeverity + " LOW severity issue(s) found - Consider improvements");
+        }
+        if (cloudOpportunities.size() > 0) {
+            System.out.println("☁️  " + cloudOpportunities.size() + " cloud integration opportunit(ies) - Modernize workload");
+        }
+        
+        System.out.println();
+        System.out.println("For detailed implementation guidance, see:");
+        System.out.println("  APPLICATION_BEST_PRACTICES_GUIDE.md");
+        System.out.println();
+        
+        System.out.println("═══════════════════════════════════════════════════════════════════");
+        System.out.println("Analysis complete!");
+        System.out.println("═══════════════════════════════════════════════════════════════════");
+    }
+    
+    /**
+     * Recursively collect XML files from directory
+     */
+    private static void collectXMLFiles(File dir, List<File> xmlFiles) {
+        File[] files = dir.listFiles();
+        if (files != null) {
+            for (File file : files) {
+                if (file.isDirectory()) {
+                    collectXMLFiles(file, xmlFiles);
+                } else if (file.getName().toLowerCase().endsWith(".xml")) {
+                    xmlFiles.add(file);
+                }
+            }
         }
     }
     

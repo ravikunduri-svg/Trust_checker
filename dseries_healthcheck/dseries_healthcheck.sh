@@ -29,13 +29,20 @@ print_banner() {
 }
 
 print_usage() {
-    echo "ERROR: dSeries installation directory not provided"
+    echo "ERROR: Arguments required"
     echo ""
-    echo "Usage: $0 <dSeries_install_directory>"
+    echo "Usage:"
+    echo "  1. Full Health Check:"
+    echo "     $0 <dSeries_install_directory>"
     echo ""
-    echo "Example:"
+    echo "  2. Standalone Application Analysis:"
+    echo "     $0 --analyze-apps <apps_directory>"
+    echo "     $0 -a <apps_directory>"
+    echo ""
+    echo "Examples:"
     echo "  $0 /opt/CA/WA_DE"
-    echo "  $0 /usr/local/dseries"
+    echo "  $0 --analyze-apps /home/user/exports/applications"
+    echo "  $0 -a /tmp/PAYROLL_APP.xml"
     echo ""
 }
 
@@ -208,6 +215,65 @@ print_banner
 if [ -z "$1" ]; then
     print_usage
     exit 2
+fi
+
+# Check for standalone application analysis mode
+if [ "$1" = "--analyze-apps" ] || [ "$1" = "-a" ]; then
+    if [ -z "$2" ]; then
+        echo "ERROR: Application directory path required"
+        echo ""
+        print_usage
+        exit 2
+    fi
+    STANDALONE_MODE="true"
+    APPS_PATH="$2"
+    
+    # Run standalone analysis
+    echo ""
+    echo "[Standalone Mode] Application Best Practices Analysis"
+    echo ""
+    
+    # Find Java
+    echo "[1/3] Locating Java..."
+    if command -v java >/dev/null 2>&1; then
+        JAVA_CMD="java"
+        echo "  Found: ${JAVA_CMD}"
+    else
+        echo "  ERROR: Java not found in PATH"
+        echo "  Please ensure Java 8 or later is installed"
+        exit 2
+    fi
+    echo ""
+    
+    # Verify JAR exists
+    echo "[2/3] Locating health check JAR..."
+    if [ ! -f "${SCRIPT_DIR}/dseries-healthcheck.jar" ]; then
+        echo "  ERROR: dseries-healthcheck.jar not found"
+        echo "  Location: ${SCRIPT_DIR}/dseries-healthcheck.jar"
+        exit 2
+    fi
+    echo "  Found: ${SCRIPT_DIR}/dseries-healthcheck.jar"
+    echo ""
+    
+    # Run analysis
+    echo "[3/3] Running application analysis..."
+    echo ""
+    echo "========================================================================"
+    echo ""
+    
+    "${JAVA_CMD}" -jar "${SCRIPT_DIR}/dseries-healthcheck.jar" --analyze-apps "${APPS_PATH}"
+    EXIT_CODE=$?
+    
+    echo ""
+    echo "========================================================================"
+    echo ""
+    if [ ${EXIT_CODE} -eq 0 ]; then
+        echo "Analysis completed successfully"
+    else
+        echo "Analysis completed with errors"
+    fi
+    echo ""
+    exit ${EXIT_CODE}
 fi
 
 DSERIES_HOME="$1"

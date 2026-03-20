@@ -33,15 +33,49 @@ REM VALIDATE ARGUMENTS
 REM ============================================================================
 
 if "%~1"=="" (
-    echo ERROR: dSeries installation directory not provided
+    echo ERROR: Arguments required
     echo.
-    echo Usage: %~nx0 ^<dSeries_install_directory^>
+    echo Usage:
+    echo   1. Full Health Check:
+    echo      %~nx0 ^<dSeries_install_directory^>
     echo.
-    echo Example:
+    echo   2. Standalone Application Analysis:
+    echo      %~nx0 --analyze-apps ^<apps_directory^>
+    echo      %~nx0 -a ^<apps_directory^>
+    echo.
+    echo Examples:
     echo   %~nx0 C:\CA\ESPdSeriesWAServer_R12_4
-    echo   %~nx0 D:\dSeries\R25_0
+    echo   %~nx0 --analyze-apps C:\exports\applications
+    echo   %~nx0 -a C:\exports\PAYROLL_APP.xml
     echo.
     goto :error
+)
+
+REM Check for standalone application analysis mode
+if "%~1"=="--analyze-apps" (
+    if "%~2"=="" (
+        echo ERROR: Application directory path required
+        echo.
+        echo Usage: %~nx0 --analyze-apps ^<apps_directory^>
+        echo.
+        goto :error
+    )
+    set "STANDALONE_MODE=true"
+    set "APPS_PATH=%~2"
+    goto :run_standalone
+)
+
+if "%~1"=="-a" (
+    if "%~2"=="" (
+        echo ERROR: Application directory path required
+        echo.
+        echo Usage: %~nx0 -a ^<apps_directory^>
+        echo.
+        goto :error
+    )
+    set "STANDALONE_MODE=true"
+    set "APPS_PATH=%~2"
+    goto :run_standalone
 )
 
 set "DSERIES_HOME=%~1"
@@ -260,6 +294,60 @@ echo   Check the generated report for detailed results
 echo ========================================================================
 echo.
 
+goto :end
+
+REM ============================================================================
+REM STANDALONE APPLICATION ANALYSIS MODE
+REM ============================================================================
+
+:run_standalone
+echo.
+echo [Standalone Mode] Application Best Practices Analysis
+echo.
+
+REM Find Java
+echo [1/3] Locating Java...
+set "JAVA_CMD=java"
+
+REM Check if Java is in PATH
+where java >nul 2>&1
+if errorlevel 1 (
+    echo   ERROR: Java not found in PATH
+    echo   Please ensure Java 8 or later is installed
+    goto :error
+)
+
+echo   Found: %JAVA_CMD%
+echo.
+
+REM Verify JAR exists
+echo [2/3] Locating health check JAR...
+if not exist "%SCRIPT_DIR%dseries-healthcheck.jar" (
+    echo   ERROR: dseries-healthcheck.jar not found
+    echo   Location: %SCRIPT_DIR%dseries-healthcheck.jar
+    goto :error
+)
+echo   Found: %SCRIPT_DIR%dseries-healthcheck.jar
+echo.
+
+REM Run analysis
+echo [3/3] Running application analysis...
+echo.
+echo ========================================================================
+echo.
+
+"%JAVA_CMD%" -jar "%SCRIPT_DIR%dseries-healthcheck.jar" --analyze-apps "%APPS_PATH%"
+set EXITCODE=%ERRORLEVEL%
+
+echo.
+echo ========================================================================
+echo.
+if %EXITCODE%==0 (
+    echo Analysis completed successfully
+) else (
+    echo Analysis completed with errors
+)
+echo.
 goto :end
 
 REM ============================================================================

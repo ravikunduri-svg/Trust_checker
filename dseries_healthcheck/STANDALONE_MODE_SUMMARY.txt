@@ -1,0 +1,314 @@
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                                                                               ║
+║   ESP dSeries Health Check Tool v4.1.0                                       ║
+║   Standalone Application Analysis Mode - Quick Reference                     ║
+║                                                                               ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
+
+┌───────────────────────────────────────────────────────────────────────────────┐
+│ WHAT'S NEW IN v4.1.0                                                          │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+  ✓ Standalone application analysis mode (no dSeries installation required)
+  ✓ Analyze exported XML files from any source
+  ✓ No database connection needed - works completely offline
+  ✓ Perfect for consultants, developers, and security audits
+  ✓ Fast analysis - seconds for hundreds of applications
+
+┌───────────────────────────────────────────────────────────────────────────────┐
+│ QUICK START                                                                   │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+  STEP 1: Export Applications
+  ────────────────────────────
+  Desktop Client:  Right-click → Export → Save as XML
+  CLI:             espappexport -A APP_NAME -f output.xml
+  REST API:        GET /application/{name}/export
+
+  STEP 2: Run Analysis
+  ─────────────────────
+  Windows:         dseries_healthcheck.bat --analyze-apps C:\exports\
+                   dseries_healthcheck.bat -a C:\exports\app.xml
+
+  Linux/Unix:      ./dseries_healthcheck.sh --analyze-apps /exports/
+                   ./dseries_healthcheck.sh -a /exports/app.xml
+
+  Direct Java:     java -jar dseries-healthcheck.jar -a /path/to/apps
+
+  STEP 3: Review Results
+  ──────────────────────
+  • Analysis summary
+  • Best practice violations (by severity)
+  • Cloud integration opportunities
+  • Specific recommendations
+
+┌───────────────────────────────────────────────────────────────────────────────┐
+│ KEY BENEFITS                                                                  │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+  ✅ NO DSERIES INSTALLATION REQUIRED
+     Run anywhere with Java - laptop, workstation, CI/CD server
+
+  ✅ NO DATABASE CONNECTION NEEDED
+     Works completely offline - perfect for consultants and audits
+
+  ✅ FAST ANALYSIS
+     Analyze hundreds of applications in seconds
+
+  ✅ EXPORT FROM ANY SOURCE
+     Desktop Client, CLI, REST API - any export method works
+
+  ✅ COMPREHENSIVE VALIDATION
+     Security, best practices, cloud opportunities - all included
+
+  ✅ PORTABLE
+     Single JAR file - works on Windows, Linux, AIX, Mac
+
+┌───────────────────────────────────────────────────────────────────────────────┐
+│ USE CASES                                                                     │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+  1. PRE-DEPLOYMENT VALIDATION
+     Validate applications before deploying to production
+
+  2. CONSULTANT REVIEW
+     External consultants can analyze without dSeries access
+
+  3. SECURITY AUDIT
+     Security teams can audit for credential exposure offline
+
+  4. CLOUD MIGRATION ASSESSMENT
+     Identify cloud integration opportunities for migration planning
+
+  5. DEVELOPMENT VALIDATION
+     Developers can validate during development without deployment
+
+  6. CI/CD INTEGRATION
+     Automate analysis in build pipelines
+
+┌───────────────────────────────────────────────────────────────────────────────┐
+│ WHAT GETS ANALYZED                                                            │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+  SECURITY (HIGH Priority)
+  ────────────────────────
+  ⚠️  Hardcoded credentials in commands
+  ⚠️  Hardcoded credentials in POJO parameters
+  ⚠️  Password exposure in XML files
+
+  CONFIGURATION (MEDIUM Priority)
+  ────────────────────────────────
+  ℹ️  Hardcoded file system paths
+  ℹ️  Large inline JavaScript/scripts
+  ℹ️  Missing application defaults
+
+  RELIABILITY (LOW Priority)
+  ──────────────────────────
+  💡 Missing retry configuration
+  💡 No calendar usage
+
+  CLOUD OPPORTUNITIES
+  ───────────────────
+  ☁️  AWS CLI → AWS plugins (S3, Lambda, Batch, Glue, EMR, etc.)
+  ☁️  Azure CLI → Azure plugins (Blob, Data Factory, Synapse, etc.)
+  ☁️  GCP CLI → GCP plugins (Storage, Dataproc, BigQuery, etc.)
+  ☁️  Databricks CLI → Databricks plugin
+  ☁️  FTP jobs → Cloud storage plugins
+
+┌───────────────────────────────────────────────────────────────────────────────┐
+│ COMPARISON: STANDALONE vs FULL HEALTH CHECK                                  │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+  Feature                          Standalone    Full Check
+  ─────────────────────────────────────────────────────────
+  Requires dSeries Installation    ❌ No         ✅ Yes
+  Requires Database Connection     ❌ No         ✅ Yes
+  Application Analysis             ✅ Yes        ✅ Yes
+  Best Practices Validation        ✅ Yes        ✅ Yes
+  Cloud Opportunities              ✅ Yes        ✅ Yes
+  System Resource Checks           ❌ No         ✅ Yes
+  Database Health Checks           ❌ No         ✅ Yes
+  Log Analysis                     ❌ No         ✅ Yes
+  Performance Metrics              ❌ No         ✅ Yes
+  Works Offline                    ✅ Yes        ❌ No
+  Portable                         ✅ Yes        ⚠️  Partial
+
+  RECOMMENDATION:
+  • Use Standalone Mode for application-specific analysis
+  • Use Full Health Check for comprehensive system validation
+
+┌───────────────────────────────────────────────────────────────────────────────┐
+│ EXAMPLES                                                                      │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+  # Analyze directory of exported applications
+  dseries_healthcheck.bat --analyze-apps C:\exports\applications
+
+  # Analyze single application file
+  dseries_healthcheck.bat -a C:\exports\PAYROLL_APP.xml
+
+  # Linux/Unix
+  ./dseries_healthcheck.sh --analyze-apps /home/user/exports
+
+  # Analyze and save report
+  dseries_healthcheck.bat -a C:\exports > analysis_report.txt
+
+  # CI/CD pipeline integration
+  java -jar dseries-healthcheck.jar -a ./apps/ || exit 1
+
+┌───────────────────────────────────────────────────────────────────────────────┐
+│ EXPORT METHODS                                                                │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+  DESKTOP CLIENT (GUI)
+  ────────────────────
+  1. Right-click on Application
+  2. Select "Export" → "Export Application"
+  3. Save as XML file
+
+  COMMAND LINE (CLI)
+  ──────────────────
+  # Single application
+  espappexport -A PAYROLL_PROCESSING -f PAYROLL.xml
+
+  # Multiple applications (pattern)
+  espappexport -A "PROD_*" -f prod_apps.xml
+
+  # All applications
+  espappexport -A "*" -f all_apps.xml
+
+  REST API
+  ────────
+  # Using curl
+  curl -X GET "http://server:9443/application/APP_NAME/export" \
+    -H "Authorization: Bearer TOKEN" -o app.xml
+
+  # Using PowerShell
+  Invoke-RestMethod -Uri "http://server:9443/application/APP_NAME/export" `
+    -Headers @{Authorization="Bearer TOKEN"} -OutFile "app.xml"
+
+┌───────────────────────────────────────────────────────────────────────────────┐
+│ SAMPLE OUTPUT                                                                 │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+  ═══════════════════════════════════════════════════════════════════
+    ESP dSeries Application Best Practices Analyzer v4.1.0
+  ═══════════════════════════════════════════════════════════════════
+    Date: 2026-02-11 16:30:45
+    Analysis Path: C:\exports\applications
+  ═══════════════════════════════════════════════════════════════════
+
+  Found 15 XML file(s) to analyze
+
+    ✓ PAYROLL_PROCESSING.xml (23 jobs)
+    ✓ DATA_SYNC.xml (45 jobs)
+    ✓ FILE_PROCESSING.xml (12 jobs)
+    ... (12 more files)
+
+  ─── Analysis Summary ───
+
+  Files processed: 15
+  Applications analyzed: 15
+  Total jobs analyzed: 342
+  Best practice violations: 23
+  Cloud integration opportunities: 47
+
+  ─── Best Practice Violations ───
+
+  ⚠️ Credentials in Command (HIGH)
+     Application: PAYROLL_PROCESSING
+     Job: EXPORT_SALARY_DATA
+     Issue: Command may contain embedded credentials
+     Recommendation: Use global variables for credentials
+
+  ─── Cloud Integration Opportunities ───
+
+  ☁️ Amazon S3 Plugin Extension
+     Application: FILE_PROCESSING
+     Current Job: UPLOAD_TO_S3 (cmd_job)
+     Opportunity: Replace AWS CLI with native S3 plugin
+     Benefit: Better error handling, monitoring
+     Documentation: https://techdocs.broadcom.com/...
+
+  ─── Summary ───
+
+  ⚠️ 8 HIGH severity issue(s) - Address immediately
+  ℹ️ 12 MEDIUM severity issue(s) - Plan fixes soon
+  💡 3 LOW severity issue(s) - Consider improvements
+  ☁️ 47 cloud integration opportunities - Modernize workload
+
+┌───────────────────────────────────────────────────────────────────────────────┐
+│ TROUBLESHOOTING                                                               │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+  Q: "No XML files found"
+  A: • Check file extension is .xml
+     • Verify file permissions
+     • Ensure correct directory path
+
+  Q: "Parse errors"
+  A: • Verify files are valid dSeries exports
+     • Check XML syntax
+     • Try exporting again
+
+  Q: "Java not found"
+  A: • Install Java 8 or later
+     • Add Java to PATH
+     • Use full path to java command
+
+┌───────────────────────────────────────────────────────────────────────────────┐
+│ BEST PRACTICES                                                                │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+  1. Run analysis on all applications monthly
+  2. Always analyze before deploying to production
+  3. Store analysis reports in version control
+  4. Compare reports over time to track improvements
+  5. Integrate into CI/CD pipeline for continuous validation
+  6. Address HIGH severity issues immediately
+  7. Use cloud opportunities for migration roadmap
+  8. Share results with development teams
+
+┌───────────────────────────────────────────────────────────────────────────────┐
+│ DOCUMENTATION                                                                 │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+  📄 STANDALONE_APP_ANALYSIS_GUIDE.md
+     Complete standalone mode guide with use cases and examples
+
+  📄 APPLICATION_BEST_PRACTICES_GUIDE.md
+     Detailed best practices guide with implementation examples
+
+  📄 VERSION_4.0_RELEASE_NOTES.md
+     Version 4.0 release notes and features
+
+  🌐 Broadcom Documentation
+     https://techdocs.broadcom.com/us/en/ca-enterprise-software/
+     intelligent-automation/ca-workload-automation-de/25-0.html
+
+┌───────────────────────────────────────────────────────────────────────────────┐
+│ VERSION HISTORY                                                               │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+  v4.1.0 (2026-02-11)
+  ───────────────────
+  • NEW: Standalone application analysis mode
+  • NEW: --analyze-apps / -a command-line option
+  • NEW: No dSeries installation required
+  • NEW: No database connection needed
+  • NEW: Updated launcher scripts for Windows and Unix
+  • NEW: Comprehensive standalone mode documentation
+
+  v4.0.0 (2026-02-11)
+  ───────────────────
+  • Application best practices analysis
+  • Cloud integration opportunity detection
+  • Support for 40+ cloud plugin extensions
+  • Security best practices validation
+
+╔═══════════════════════════════════════════════════════════════════════════════╗
+║                                                                               ║
+║   Perfect for consultants, developers, and security teams!                   ║
+║   Analyze applications anywhere, anytime - no dSeries required.              ║
+║                                                                               ║
+╚═══════════════════════════════════════════════════════════════════════════════╝
