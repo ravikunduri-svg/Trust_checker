@@ -401,8 +401,9 @@ public class DSeriesHealthCheck {
         System.out.println("  apps_directory   - Directory containing exported application XML files");
         System.out.println();
         System.out.println("Standalone Application Analysis Mode:");
-        System.out.println("  Analyzes exported application XML files without requiring dSeries installation");
-        System.out.println("  Perfect for analyzing artifacts exported from Desktop Client or CLI");
+        System.out.println("  Analyzes application files without requiring dSeries installation");
+        System.out.println("  Supports: .xml files (exported) and files without extension (native format)");
+        System.out.println("  Perfect for analyzing Desktop Client apps or exported artifacts");
         System.out.println("  Provides best practices validation and cloud integration recommendations");
         System.out.println("  No database connection required");
         System.out.println();
@@ -2998,12 +2999,13 @@ public class DSeriesHealthCheck {
         }
         
         if (xmlFiles.isEmpty()) {
-            System.out.println("⚠️  No XML files found in: " + appsPath);
+            System.out.println("⚠️  No application files found in: " + appsPath);
             System.out.println();
             System.out.println("Tips:");
-            System.out.println("  - Ensure XML files have .xml extension");
+            System.out.println("  - Accepts .xml files (exported applications)");
+            System.out.println("  - Accepts files without extension (dSeries native format)");
             System.out.println("  - Check file permissions");
-            System.out.println("  - Export applications from dSeries Desktop Client or CLI");
+            System.out.println("  - Verify files contain valid XML content");
             System.exit(0);
         }
         
@@ -3142,6 +3144,7 @@ public class DSeriesHealthCheck {
     
     /**
      * Recursively collect XML files from directory
+     * Accepts both .xml files and files without extensions (dSeries native format)
      */
     private static void collectXMLFiles(File dir, List<File> xmlFiles) {
         File[] files = dir.listFiles();
@@ -3149,10 +3152,35 @@ public class DSeriesHealthCheck {
             for (File file : files) {
                 if (file.isDirectory()) {
                     collectXMLFiles(file, xmlFiles);
-                } else if (file.getName().toLowerCase().endsWith(".xml")) {
-                    xmlFiles.add(file);
+                } else {
+                    String fileName = file.getName().toLowerCase();
+                    // Accept .xml files or files without extension (dSeries native format)
+                    if (fileName.endsWith(".xml") || !fileName.contains(".")) {
+                        // Verify it's actually an XML file by checking first few bytes
+                        if (isXMLFile(file)) {
+                            xmlFiles.add(file);
+                        }
+                    }
                 }
             }
+        }
+    }
+    
+    /**
+     * Check if file is an XML file by reading first few bytes
+     */
+    private static boolean isXMLFile(File file) {
+        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
+            String firstLine = reader.readLine();
+            if (firstLine == null) return false;
+            
+            // Check for XML declaration or root element
+            String trimmed = firstLine.trim();
+            return trimmed.startsWith("<?xml") || 
+                   trimmed.startsWith("<appl") || 
+                   trimmed.startsWith("<application");
+        } catch (Exception e) {
+            return false;
         }
     }
     
