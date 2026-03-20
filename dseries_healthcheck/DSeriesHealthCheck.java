@@ -15,8 +15,41 @@ import java.security.GeneralSecurityException;
  * Performs technical reviews including architecture, security, database,
  * agents, clients, high availability, and performance checks.
  * 
- * Version: 4.0.0
+ * Version: 4.2.2
  * Date: 2026-02-11
+ * 
+ * Version 4.2.2 Enhancements:
+ * - Fixed namespace-aware calendar detection for all XML formats
+ * - Made dependency visualization optional with --show-dependencies (-d) flag
+ * - Dependency analysis now only shows when explicitly requested
+ * 
+ * Version 4.2.1 Enhancements:
+ * - Fixed calendar detection to recognize "daily", "weekly", "monthly", "yearly" schedules
+ * - Prevents false calendar recommendations for apps using frequency-based scheduling
+ * 
+ * Version 4.2.0 Enhancements:
+ * - Dependency and flow visualization for applications
+ * - Cross-application dependency tracking (ext_job with applid)
+ * - Internal job dependency analysis (relconditionlist)
+ * - Multiple output formats: tables and ASCII flow graphs
+ * - Dependency statistics and relationship mapping
+ * 
+ * Version 4.1.2 Enhancements:
+ * - Fixed ext_job (external/sub-application jobs) counting - now included in job totals
+ * - Excluded link elements from job counts (they are flow control, not jobs)
+ * - Improved calendar usage detection to check actual schedules (MON-SUN, calendar references)
+ * - Increased calendar recommendation threshold from >5 to >10 jobs to reduce false positives
+ * - Added multi-level calendar detection (app-level, run frequency, job schedules)
+ * 
+ * Version 4.1.1 Enhancements:
+ * - Added support for dSeries native application files (files without .xml extension)
+ * - Refined FTP cloud recommendations to exclude native file transfers
+ * - Fixed unix_job and nt_job counting in application analysis
+ * 
+ * Version 4.1.0 Enhancements:
+ * - Standalone application analysis mode (--analyze-apps flag)
+ * - Analyze exported application artifacts without dSeries installation
+ * - No database connection required for application analysis
  * 
  * Version 4.0.0 Enhancements:
  * - Application best practices scanner with XML analysis
@@ -195,6 +228,7 @@ public class DSeriesHealthCheck {
     private static boolean useExternalDbConfig = false;
     private static String externalDbConfigFile = null;
     private static int serverPort = 7599; // Default, will be read from instanceconf.xml
+    private static boolean showDependencies = false; // Flag to control dependency visualization
     
     // Database connection details
     private static String dbHost = "localhost";
@@ -304,6 +338,10 @@ public class DSeriesHealthCheck {
                 printUsage();
                 System.exit(2);
             }
+            // Check for --show-dependencies flag
+            if (args.length > 2 && (args[2].equals("--show-dependencies") || args[2].equals("-d"))) {
+                showDependencies = true;
+            }
             runStandaloneApplicationAnalysis(args[1]);
             return;
         }
@@ -392,13 +430,15 @@ public class DSeriesHealthCheck {
         System.out.println("     java DSeriesHealthCheck <install_dir> [sql_config_file]");
         System.out.println();
         System.out.println("  2. Standalone Application Analysis:");
-        System.out.println("     java DSeriesHealthCheck --analyze-apps <apps_directory>");
-        System.out.println("     java DSeriesHealthCheck -a <apps_directory>");
+        System.out.println("     java DSeriesHealthCheck --analyze-apps <apps_directory> [--show-dependencies]");
+        System.out.println("     java DSeriesHealthCheck -a <apps_directory> [-d]");
         System.out.println();
         System.out.println("Arguments:");
-        System.out.println("  install_dir      - dSeries installation directory (required for full check)");
-        System.out.println("  sql_config_file  - SQL queries configuration file (optional)");
-        System.out.println("  apps_directory   - Directory containing exported application XML files");
+        System.out.println("  install_dir         - dSeries installation directory (required for full check)");
+        System.out.println("  sql_config_file     - SQL queries configuration file (optional)");
+        System.out.println("  apps_directory      - Directory containing exported application XML files");
+        System.out.println("  --show-dependencies - Show dependency and flow analysis (optional)");
+        System.out.println("  -d                  - Short form of --show-dependencies");
         System.out.println();
         System.out.println("Standalone Application Analysis Mode:");
         System.out.println("  Analyzes application files without requiring dSeries installation");
@@ -406,6 +446,7 @@ public class DSeriesHealthCheck {
         System.out.println("  Perfect for analyzing Desktop Client apps or exported artifacts");
         System.out.println("  Provides best practices validation and cloud integration recommendations");
         System.out.println("  No database connection required");
+        System.out.println("  Use --show-dependencies flag to include dependency/flow visualization");
         System.out.println();
         System.out.println("Examples:");
         System.out.println("  # Full health check");
@@ -414,6 +455,10 @@ public class DSeriesHealthCheck {
         System.out.println("  # Analyze exported applications only");
         System.out.println("  java DSeriesHealthCheck --analyze-apps C:/exports/applications");
         System.out.println("  java DSeriesHealthCheck -a /home/user/exported_apps");
+        System.out.println();
+        System.out.println("  # Analyze with dependency visualization");
+        System.out.println("  java DSeriesHealthCheck --analyze-apps C:/exports/apps --show-dependencies");
+        System.out.println("  java DSeriesHealthCheck -a C:/exports/apps -d");
         System.out.println();
         System.out.println("  # Analyze single application file");
         System.out.println("  java DSeriesHealthCheck --analyze-apps C:/exports/PAYROLL_APP.xml");
@@ -429,7 +474,7 @@ public class DSeriesHealthCheck {
     
     private static void printHeader() {
         System.out.println("═══════════════════════════════════════════════════════════════════");
-        System.out.println("  ESP dSeries Workload Automation Health Check Tool v4.0.0");
+        System.out.println("  ESP dSeries Workload Automation Health Check Tool v4.2.2");
         System.out.println("═══════════════════════════════════════════════════════════════════");
         System.out.println("  Date: " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()));
         System.out.println("  Host: " + getHostname());
@@ -2964,7 +3009,7 @@ public class DSeriesHealthCheck {
      */
     private static void runStandaloneApplicationAnalysis(String appsPath) {
         System.out.println("═══════════════════════════════════════════════════════════════════");
-        System.out.println("  ESP dSeries Application Best Practices Analyzer v4.0.0");
+        System.out.println("  ESP dSeries Application Best Practices Analyzer v4.2.2");
         System.out.println("═══════════════════════════════════════════════════════════════════");
         System.out.println("  Date: " + new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date()));
         System.out.println("  Analysis Path: " + appsPath);
@@ -3034,6 +3079,7 @@ public class DSeriesHealthCheck {
         int parseErrors = 0;
         List<BestPracticeViolation> violations = new ArrayList<>();
         List<CloudOpportunity> cloudOpportunities = new ArrayList<>();
+        List<ApplicationAnalysisResult> allResults = new ArrayList<>();  // Store all results for dependency analysis
         
         for (File xmlFile : xmlFiles) {
             try {
@@ -3043,7 +3089,8 @@ public class DSeriesHealthCheck {
                     totalJobs += result.jobCount;
                     violations.addAll(result.violations);
                     cloudOpportunities.addAll(result.cloudOpportunities);
-                    System.out.println("  ✓ " + xmlFile.getName() + " (" + result.jobCount + " jobs)");
+                    allResults.add(result);  // Store for dependency analysis
+                    System.out.println("  ✓ " + result.applicationName + " (" + result.jobCount + " jobs)");
                 }
             } catch (Exception e) {
                 parseErrors++;
@@ -3123,6 +3170,9 @@ public class DSeriesHealthCheck {
             System.out.println("   Applications follow best practices");
         }
         
+        // Display dependency analysis
+        displayDependencyAnalysis(allResults);
+        
         // Summary recommendations
         System.out.println();
         System.out.println("─── Summary ───\n");
@@ -3152,6 +3202,184 @@ public class DSeriesHealthCheck {
         System.out.println("═══════════════════════════════════════════════════════════════════");
         System.out.println("Analysis complete!");
         System.out.println("═══════════════════════════════════════════════════════════════════");
+    }
+    
+    /**
+     * Display comprehensive dependency analysis with tables and flow visualization
+     */
+    private static void displayDependencyAnalysis(List<ApplicationAnalysisResult> results) {
+        if (results.isEmpty() || !showDependencies) return;
+        
+        System.out.println();
+        System.out.println("═══════════════════════════════════════════════════════════════════");
+        System.out.println("DEPENDENCY & FLOW ANALYSIS");
+        System.out.println("═══════════════════════════════════════════════════════════════════");
+        System.out.println();
+        
+        // Build cross-application dependency map
+        Map<String, Set<String>> appDependencies = new LinkedHashMap<>();
+        Map<String, List<ExternalDependency>> externalDepDetails = new LinkedHashMap<>();
+        
+        for (ApplicationAnalysisResult result : results) {
+            String appName = result.applicationName;
+            appDependencies.putIfAbsent(appName, new HashSet<>());
+            
+            // Track external dependencies
+            for (ExternalDependency extDep : result.externalDependencies) {
+                appDependencies.get(appName).add(extDep.toApplication);
+                externalDepDetails.computeIfAbsent(appName, k -> new ArrayList<>()).add(extDep);
+            }
+        }
+        
+        // Display External (Cross-Application) Dependencies
+        if (!externalDepDetails.isEmpty()) {
+            System.out.println("─── Cross-Application Dependencies ───");
+            System.out.println();
+            System.out.println("Applications that call other applications:");
+            System.out.println();
+            
+            // Table header
+            System.out.println(String.format("%-20s %-20s %-25s %-15s", 
+                "From Application", "From Job", "To Application", "Job Type"));
+            for (int i = 0; i < 85; i++) System.out.print("─");
+            System.out.println();
+            
+            for (Map.Entry<String, List<ExternalDependency>> entry : externalDepDetails.entrySet()) {
+                for (ExternalDependency dep : entry.getValue()) {
+                    System.out.println(String.format("%-20s %-20s %-25s %-15s",
+                        truncate(dep.fromApplication, 20),
+                        truncate(dep.fromJob, 20),
+                        truncate(dep.toApplication, 25),
+                        dep.jobType));
+                }
+            }
+            System.out.println();
+        }
+        
+        // Display Application Dependency Graph (ASCII)
+        if (!appDependencies.isEmpty()) {
+            System.out.println("─── Application Dependency Graph ───");
+            System.out.println();
+            
+            // Find applications with dependencies
+            Set<String> appsWithDeps = new HashSet<>();
+            for (Map.Entry<String, Set<String>> entry : appDependencies.entrySet()) {
+                if (!entry.getValue().isEmpty()) {
+                    appsWithDeps.add(entry.getKey());
+                    appsWithDeps.addAll(entry.getValue());
+                }
+            }
+            
+            if (appsWithDeps.isEmpty()) {
+                System.out.println("ℹ️  No cross-application dependencies found");
+                System.out.println("   All applications are independent");
+            } else {
+                for (Map.Entry<String, Set<String>> entry : appDependencies.entrySet()) {
+                    if (!entry.getValue().isEmpty()) {
+                        System.out.println("📦 " + entry.getKey());
+                        for (String targetApp : entry.getValue()) {
+                            System.out.println("   └─> " + targetApp);
+                        }
+                        System.out.println();
+                    }
+                }
+            }
+            System.out.println();
+        }
+        
+        // Display Internal Job Dependencies for each application
+        System.out.println("─── Internal Job Dependencies (Per Application) ───");
+        System.out.println();
+        
+        for (ApplicationAnalysisResult result : results) {
+            if (result.internalDependencies.isEmpty()) continue;
+            
+            System.out.println("Application: " + result.applicationName + " (" + result.jobCount + " jobs)");
+            System.out.println();
+            
+            // Group dependencies for better visualization
+            Map<String, List<String>> jobFlows = new LinkedHashMap<>();
+            for (JobDependency dep : result.internalDependencies) {
+                jobFlows.computeIfAbsent(dep.fromJob, k -> new ArrayList<>()).add(dep.toJob);
+            }
+            
+            // Display as a flow
+            if (jobFlows.size() <= 20) {
+                // For small apps, show full flow
+                for (Map.Entry<String, List<String>> entry : jobFlows.entrySet()) {
+                    System.out.println("  " + entry.getKey());
+                    for (String target : entry.getValue()) {
+                        System.out.println("    └─> " + target);
+                    }
+                }
+            } else {
+                // For large apps, show table format
+                System.out.println(String.format("  %-30s %-30s %-15s", 
+                    "From Job", "To Job", "Condition"));
+                System.out.print("  ");
+                for (int i = 0; i < 80; i++) System.out.print("─");
+                System.out.println();
+                
+                for (JobDependency dep : result.internalDependencies) {
+                    System.out.println(String.format("  %-30s %-30s %-15s",
+                        truncate(dep.fromJob, 30),
+                        truncate(dep.toJob, 30),
+                        dep.condition));
+                }
+            }
+            
+            System.out.println();
+            System.out.println("  Total dependencies: " + result.internalDependencies.size());
+            System.out.println();
+        }
+        
+        // Summary statistics
+        int totalInternalDeps = results.stream().mapToInt(r -> r.internalDependencies.size()).sum();
+        int totalExternalDeps = results.stream().mapToInt(r -> r.externalDependencies.size()).sum();
+        
+        System.out.println("─── Dependency Statistics ───");
+        System.out.println();
+        System.out.println("Applications analyzed: " + results.size());
+        System.out.println("Internal job dependencies: " + totalInternalDeps);
+        System.out.println("Cross-application dependencies: " + totalExternalDeps);
+        System.out.println("Applications with external dependencies: " + externalDepDetails.size());
+        System.out.println();
+    }
+    
+    /**
+     * Truncate string to specified length with ellipsis
+     */
+    private static String truncate(String str, int maxLength) {
+        if (str == null) return "";
+        if (str.length() <= maxLength) return str;
+        return str.substring(0, maxLength - 3) + "...";
+    }
+    
+    /**
+     * Get elements by tag name, handling both namespaced and non-namespaced elements
+     * Supports: <cmd_job> and <app:cmd_job>
+     */
+    private static NodeList getElementsByTagNameNS(Document doc, String tagName) {
+        // Try without namespace first
+        NodeList nodes = doc.getElementsByTagName(tagName);
+        if (nodes.getLength() > 0) {
+            return nodes;
+        }
+        // Try with app: namespace prefix
+        return doc.getElementsByTagName("app:" + tagName);
+    }
+    
+    /**
+     * Get elements by tag name from an element, handling both namespaced and non-namespaced
+     */
+    private static NodeList getElementsByTagNameNS(Element element, String tagName) {
+        // Try without namespace first
+        NodeList nodes = element.getElementsByTagName(tagName);
+        if (nodes.getLength() > 0) {
+            return nodes;
+        }
+        // Try with app: namespace prefix
+        return element.getElementsByTagName("app:" + tagName);
     }
     
     /**
@@ -3186,10 +3414,11 @@ public class DSeriesHealthCheck {
             String firstLine = reader.readLine();
             if (firstLine == null) return false;
             
-            // Check for XML declaration or root element
+            // Check for XML declaration or root element (with or without namespace prefix)
             String trimmed = firstLine.trim();
             return trimmed.startsWith("<?xml") || 
                    trimmed.startsWith("<appl") || 
+                   trimmed.startsWith("<app:appl") ||  // namespace prefix
                    trimmed.startsWith("<application");
         } catch (Exception e) {
             return false;
@@ -3366,18 +3595,23 @@ public class DSeriesHealthCheck {
         }
         
         // Count jobs and analyze each type
-        NodeList cmdJobs = doc.getElementsByTagName("cmd_job");
-        NodeList scriptJobs = doc.getElementsByTagName("script_job");
-        NodeList pojoJobs = doc.getElementsByTagName("pojo_job");
-        NodeList boxJobs = doc.getElementsByTagName("box_job");
-        NodeList dbJobs = doc.getElementsByTagName("db_job");
-        NodeList ftpJobs = doc.getElementsByTagName("ftp_job");
-        NodeList unixJobs = doc.getElementsByTagName("unix_job");
-        NodeList ntJobs = doc.getElementsByTagName("nt_job");
+        // Note: link elements are NOT jobs - they are flow control elements
+        NodeList cmdJobs = getElementsByTagNameNS(doc, "cmd_job");
+        NodeList scriptJobs = getElementsByTagNameNS(doc, "script_job");
+        NodeList pojoJobs = getElementsByTagNameNS(doc, "pojo_job");
+        NodeList boxJobs = getElementsByTagNameNS(doc, "box_job");
+        NodeList dbJobs = getElementsByTagNameNS(doc, "db_job");
+        NodeList ftpJobs = getElementsByTagNameNS(doc, "ftp_job");
+        NodeList unixJobs = getElementsByTagNameNS(doc, "unix_job");
+        NodeList ntJobs = getElementsByTagNameNS(doc, "nt_job");
+        NodeList extJobs = getElementsByTagNameNS(doc, "ext_job");  // External/sub-application jobs
         
         result.jobCount = cmdJobs.getLength() + scriptJobs.getLength() + pojoJobs.getLength() + 
                          boxJobs.getLength() + dbJobs.getLength() + ftpJobs.getLength() +
-                         unixJobs.getLength() + ntJobs.getLength();
+                         unixJobs.getLength() + ntJobs.getLength() + extJobs.getLength();
+        
+        // Extract dependencies from all job types
+        extractDependencies(doc, result);
         
         // Analyze application-level best practices
         analyzeApplicationLevel(applElement, result);
@@ -3408,6 +3642,61 @@ public class DSeriesHealthCheck {
         }
         
         return result;
+    }
+    
+    /**
+     * Extract job dependencies (internal and external) from application
+     */
+    private static void extractDependencies(Document doc, ApplicationAnalysisResult result) {
+        String appName = result.applicationName;
+        
+        // Job types to analyze for dependencies
+        String[] jobTypes = {"cmd_job", "script_job", "pojo_job", "unix_job", "nt_job", "ext_job", "db_job", "ftp_job", "box_job", "link"};
+        
+        for (String jobType : jobTypes) {
+            NodeList jobs = getElementsByTagNameNS(doc, jobType);
+            
+            for (int i = 0; i < jobs.getLength(); i++) {
+                Element job = (Element) jobs.item(i);
+                String jobName = job.getAttribute("name");
+                
+                // Handle qualified names (e.g., "WTDWKLY.END")
+                String qualifier = job.getAttribute("qualifier");
+                if (qualifier != null && !qualifier.isEmpty()) {
+                    jobName = jobName + "." + qualifier;
+                }
+                
+                // Extract internal dependencies (relconditionlist)
+                NodeList depLists = getElementsByTagNameNS(job, "relconditionlist");
+                if (depLists.getLength() > 0) {
+                    Element depList = (Element) depLists.item(0);
+                    NodeList conditions = getElementsByTagNameNS(depList, "relcondition");
+                    
+                    for (int j = 0; j < conditions.getLength(); j++) {
+                        Element condition = (Element) conditions.item(j);
+                        NodeList successorNodes = getElementsByTagNameNS(condition, "successorname");
+                        NodeList conditionNodes = getElementsByTagNameNS(condition, "condition");
+                        
+                        if (successorNodes.getLength() > 0) {
+                            String successor = successorNodes.item(0).getTextContent().trim();
+                            String condType = conditionNodes.getLength() > 0 ? 
+                                            conditionNodes.item(0).getTextContent().trim() : "NORMAL";
+                            
+                            result.internalDependencies.add(new JobDependency(jobName, successor, condType));
+                        }
+                    }
+                }
+                
+                // Extract external dependencies (ext_job with applid)
+                if (jobType.equals("ext_job")) {
+                    NodeList applidNodes = getElementsByTagNameNS(job, "applid");
+                    if (applidNodes.getLength() > 0) {
+                        String targetApp = applidNodes.item(0).getTextContent().trim();
+                        result.externalDependencies.add(new ExternalDependency(appName, jobName, targetApp, "ext_job"));
+                    }
+                }
+            }
+        }
     }
     
     /**
@@ -3451,28 +3740,93 @@ public class DSeriesHealthCheck {
             ));
         }
         
-        // Check for calendar usage
-        NodeList runFreq = applElement.getElementsByTagName("run");
+        // Check for calendar usage - Look in multiple places (namespace-aware)
+        NodeList runFreq = getElementsByTagNameNS(applElement, "run");
         boolean usesCalendar = false;
+        
+        // Check in run frequency elements
         for (int i = 0; i < runFreq.getLength(); i++) {
             Element runElement = (Element) runFreq.item(i);
-            NodeList calNodes = runElement.getElementsByTagName("calendar");
+            NodeList calNodes = getElementsByTagNameNS(runElement, "calendar");
             if (calNodes.getLength() > 0) {
                 usesCalendar = true;
                 break;
             }
         }
         
-        if (!usesCalendar && result.jobCount > 5) {
-            result.violations.add(new BestPracticeViolation(
-                "Calendar Usage",
-                "LOW",
-                "Scheduling",
-                appName,
-                null,
-                "Application with " + result.jobCount + " jobs does not use calendars for scheduling",
-                "Consider using calendars to define holidays, special days, and workdays for more flexible scheduling."
-            ));
+        // Also check schedules section for day-based scheduling
+        if (!usesCalendar) {
+            NodeList schedules = getElementsByTagNameNS(applElement, "schedules");
+            if (schedules.getLength() > 0) {
+                String schedText = schedules.item(0).getTextContent();
+                if (schedText != null) {
+                    schedText = schedText.trim().toUpperCase();
+                    // Look for calendar indicators: day names, frequency keywords, calendar references
+                    if (schedText.matches(".*(MON|TUE|WED|THU|FRI|SAT|SUN|DAILY|WEEKLY|MONTHLY|YEARLY|CALENDAR|HOLIDAY|WORKDAY).*")) {
+                        usesCalendar = true;
+                    }
+                }
+            }
+        }
+        
+        // Check individual job schedules if not found at app level
+        if (!usesCalendar && result.jobCount > 10) {
+            String[] jobTypes = {"cmd_job", "script_job", "pojo_job", "unix_job", "nt_job", "ext_job", "db_job", "ftp_job"};
+            outerLoop:
+            for (String jobType : jobTypes) {
+                NodeList jobs = getElementsByTagNameNS(applElement, jobType);
+                for (int i = 0; i < jobs.getLength(); i++) {
+                    Element job = (Element) jobs.item(i);
+                    NodeList jobSchedules = getElementsByTagNameNS(job, "schedules");
+                    if (jobSchedules.getLength() > 0) {
+                        String jobSchedText = jobSchedules.item(0).getTextContent();
+                        if (jobSchedText != null) {
+                            jobSchedText = jobSchedText.trim().toUpperCase();
+                            if (jobSchedText.matches(".*(MON|TUE|WED|THU|FRI|SAT|SUN|DAILY|WEEKLY|MONTHLY|YEARLY|CALENDAR|HOLIDAY|WORKDAY).*")) {
+                                usesCalendar = true;
+                                break outerLoop;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        // Only suggest calendar usage if:
+        // 1. Application has many jobs (>10, not >5) to avoid false positives on small apps
+        // 2. No calendar usage detected at all
+        // 3. Application actually has scheduled jobs (not just triggered/on-demand)
+        if (!usesCalendar && result.jobCount > 10) {
+            // Verify the app has actual scheduled jobs before suggesting calendar usage
+            boolean hasScheduledJobs = false;
+            String[] jobTypes = {"cmd_job", "script_job", "pojo_job", "unix_job", "nt_job", "ext_job", "db_job", "ftp_job"};
+            for (String jobType : jobTypes) {
+                NodeList jobs = applElement.getElementsByTagName(jobType);
+                for (int i = 0; i < jobs.getLength(); i++) {
+                    Element job = (Element) jobs.item(i);
+                    NodeList jobSchedules = job.getElementsByTagName("schedules");
+                    if (jobSchedules.getLength() > 0) {
+                        String schedContent = jobSchedules.item(0).getTextContent();
+                        if (schedContent != null && schedContent.trim().length() > 0) {
+                            hasScheduledJobs = true;
+                            break;
+                        }
+                    }
+                }
+                if (hasScheduledJobs) break;
+            }
+            
+            if (hasScheduledJobs) {
+                result.violations.add(new BestPracticeViolation(
+                    "Calendar Usage",
+                    "LOW",
+                    "Scheduling",
+                    appName,
+                    null,
+                    "Application with " + result.jobCount + " scheduled jobs does not use day-specific or calendar-based scheduling",
+                    "Consider using calendars to define holidays, special days, and workdays for more flexible scheduling."
+                ));
+            }
         }
     }
     
@@ -3975,6 +4329,8 @@ public class DSeriesHealthCheck {
         int jobCount;
         List<BestPracticeViolation> violations = new ArrayList<>();
         List<CloudOpportunity> cloudOpportunities = new ArrayList<>();
+        List<JobDependency> internalDependencies = new ArrayList<>();  // Dependencies within the app
+        List<ExternalDependency> externalDependencies = new ArrayList<>();  // Dependencies to other apps
     }
     
     /**
@@ -4024,6 +4380,38 @@ public class DSeriesHealthCheck {
             this.description = description;
             this.benefit = benefit;
             this.documentationUrl = documentationUrl;
+        }
+    }
+    
+    /**
+     * Inner class to represent an internal job dependency (within same application)
+     */
+    private static class JobDependency {
+        String fromJob;
+        String toJob;
+        String condition;  // NORMAL, ABNORMAL, etc.
+        
+        JobDependency(String fromJob, String toJob, String condition) {
+            this.fromJob = fromJob;
+            this.toJob = toJob;
+            this.condition = condition;
+        }
+    }
+    
+    /**
+     * Inner class to represent an external application dependency
+     */
+    private static class ExternalDependency {
+        String fromApplication;
+        String fromJob;
+        String toApplication;
+        String jobType;  // ext_job, etc.
+        
+        ExternalDependency(String fromApplication, String fromJob, String toApplication, String jobType) {
+            this.fromApplication = fromApplication;
+            this.fromJob = fromJob;
+            this.toApplication = toApplication;
+            this.jobType = jobType;
         }
     }
 }

@@ -36,13 +36,13 @@ print_usage() {
     echo "     $0 <dSeries_install_directory>"
     echo ""
     echo "  2. Standalone Application Analysis:"
-    echo "     $0 --analyze-apps <apps_directory>"
-    echo "     $0 -a <apps_directory>"
+    echo "     $0 --analyze-apps <apps_directory> [--show-dependencies]"
+    echo "     $0 -a <apps_directory> [-d]"
     echo ""
     echo "Examples:"
     echo "  $0 /opt/CA/WA_DE"
     echo "  $0 --analyze-apps /home/user/exports/applications"
-    echo "  $0 -a /tmp/PAYROLL_APP.xml"
+    echo "  $0 -a /tmp/PAYROLL_APP.xml --show-dependencies"
     echo ""
 }
 
@@ -227,6 +227,12 @@ if [ "$1" = "--analyze-apps" ] || [ "$1" = "-a" ]; then
     fi
     STANDALONE_MODE="true"
     APPS_PATH="$2"
+    SHOW_DEPS_FLAG=""
+    
+    # Check for --show-dependencies flag
+    if [ "$3" = "--show-dependencies" ] || [ "$3" = "-d" ]; then
+        SHOW_DEPS_FLAG="$3"
+    fi
     
     # Run standalone analysis
     echo ""
@@ -261,7 +267,7 @@ if [ "$1" = "--analyze-apps" ] || [ "$1" = "-a" ]; then
     echo "========================================================================"
     echo ""
     
-    "${JAVA_CMD}" -jar "${SCRIPT_DIR}/dseries-healthcheck.jar" --analyze-apps "${APPS_PATH}"
+    "${JAVA_CMD}" -jar "${SCRIPT_DIR}/dseries-healthcheck.jar" --analyze-apps "${APPS_PATH}" ${SHOW_DEPS_FLAG}
     EXIT_CODE=$?
     
     echo ""

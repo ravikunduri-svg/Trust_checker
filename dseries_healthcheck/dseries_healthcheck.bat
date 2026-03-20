@@ -40,13 +40,13 @@ if "%~1"=="" (
     echo      %~nx0 ^<dSeries_install_directory^>
     echo.
     echo   2. Standalone Application Analysis:
-    echo      %~nx0 --analyze-apps ^<apps_directory^>
-    echo      %~nx0 -a ^<apps_directory^>
+    echo      %~nx0 --analyze-apps ^<apps_directory^> [--show-dependencies]
+    echo      %~nx0 -a ^<apps_directory^> [-d]
     echo.
     echo Examples:
     echo   %~nx0 C:\CA\ESPdSeriesWAServer_R12_4
     echo   %~nx0 --analyze-apps C:\exports\applications
-    echo   %~nx0 -a C:\exports\PAYROLL_APP.xml
+    echo   %~nx0 -a C:\exports\PAYROLL_APP.xml --show-dependencies
     echo.
     goto :error
 )
@@ -56,12 +56,15 @@ if "%~1"=="--analyze-apps" (
     if "%~2"=="" (
         echo ERROR: Application directory path required
         echo.
-        echo Usage: %~nx0 --analyze-apps ^<apps_directory^>
+        echo Usage: %~nx0 --analyze-apps ^<apps_directory^> [--show-dependencies]
         echo.
         goto :error
     )
     set "STANDALONE_MODE=true"
     set "APPS_PATH=%~2"
+    set "SHOW_DEPS_FLAG="
+    if "%~3"=="--show-dependencies" set "SHOW_DEPS_FLAG=--show-dependencies"
+    if "%~3"=="-d" set "SHOW_DEPS_FLAG=-d"
     goto :run_standalone
 )
 
@@ -69,12 +72,15 @@ if "%~1"=="-a" (
     if "%~2"=="" (
         echo ERROR: Application directory path required
         echo.
-        echo Usage: %~nx0 -a ^<apps_directory^>
+        echo Usage: %~nx0 -a ^<apps_directory^> [-d]
         echo.
         goto :error
     )
     set "STANDALONE_MODE=true"
     set "APPS_PATH=%~2"
+    set "SHOW_DEPS_FLAG="
+    if "%~3"=="--show-dependencies" set "SHOW_DEPS_FLAG=--show-dependencies"
+    if "%~3"=="-d" set "SHOW_DEPS_FLAG=-d"
     goto :run_standalone
 )
 
@@ -336,7 +342,7 @@ echo.
 echo ========================================================================
 echo.
 
-"%JAVA_CMD%" -jar "%SCRIPT_DIR%dseries-healthcheck.jar" --analyze-apps "%APPS_PATH%"
+"%JAVA_CMD%" -jar "%SCRIPT_DIR%dseries-healthcheck.jar" --analyze-apps "%APPS_PATH%" %SHOW_DEPS_FLAG%
 set EXITCODE=%ERRORLEVEL%
 
 echo.
