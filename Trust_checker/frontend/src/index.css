@@ -1,0 +1,23 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    @apply antialiased;
+  }
+
+  body {
+    @apply bg-white text-gray-900 dark:bg-gray-950 dark:text-gray-100 transition-colors duration-200;
+  }
+}
+
+@layer utilities {
+  .risk-low    { @apply text-green-600 dark:text-green-400; }
+  .risk-medium { @apply text-amber-600 dark:text-amber-400; }
+  .risk-high   { @apply text-red-600   dark:text-red-400;   }
+
+  .badge-low    { @apply bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200; }
+  .badge-medium { @apply bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200; }
+  .badge-high   { @apply bg-red-100   text-red-800   dark:bg-red-900   dark:text-red-200;   }
+}
