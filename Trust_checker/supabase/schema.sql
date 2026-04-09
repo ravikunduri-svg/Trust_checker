@@ -22,6 +22,19 @@ create table if not exists checks (
 -- Index for fast UUID lookups
 create index if not exists checks_id_idx on checks (id);
 
+-- RLS: enable but allow anon access (public app, no auth required)
+alter table checks enable row level security;
+
+create policy "anon can insert checks"
+  on checks for insert
+  to anon
+  with check (true);
+
+create policy "anon can read checks"
+  on checks for select
+  to anon
+  using (true);
+
 -- Daily stats view for monitoring
 create or replace view daily_stats as
 select
