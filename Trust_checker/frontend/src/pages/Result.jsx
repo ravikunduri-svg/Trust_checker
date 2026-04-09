@@ -17,6 +17,10 @@ export default function Result() {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
+    setResult(null);
+    setError('');
+    setLoading(true);
+
     getResult(id)
       .then((data) => {
         setResult(data);
